@@ -1,4 +1,11 @@
-import type { AssetType, CacheResult, PickedAsset, PlayerConfig, PlayerStatus } from './types'
+import type {
+  AssetType,
+  CacheResult,
+  DisplayInfo,
+  PickedAsset,
+  PlayerConfig,
+  PlayerStatus
+} from './types'
 
 export type AssetPickOptions = {
   kind?: 'image' | 'video' | 'media'
@@ -15,12 +22,15 @@ export type FutaeApi = {
     pickFolder: () => Promise<PickedAsset[]>
     cacheRemote: (url: string, type: AssetType) => Promise<CacheResult | null>
   }
+  displays: {
+    list: () => Promise<DisplayInfo[]>
+  }
   player: {
     start: () => Promise<PlayerStatus>
     stop: () => Promise<PlayerStatus>
     status: () => Promise<PlayerStatus>
-    setPrivacy: (enabled: boolean) => Promise<void>
-    onPrivacy: (handler: (enabled: boolean) => void) => () => void
+    setOverlay: (enabled: boolean) => Promise<void>
+    onOverlay: (handler: (enabled: boolean) => void) => () => void
     heartbeat: () => void
   }
   utils: {

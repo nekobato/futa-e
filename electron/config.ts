@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import type { PlayerConfig } from '../src/shared/types'
 import { coerceConfig, createDefaultConfig } from '../src/shared/defaults'
 
-const getConfigPath = (): string => join(app.getPath('userData'), 'futae-config.json')
+const getConfigPath = (): string =>
+  join(app.getPath('userData'), 'futae-config.json')
 
 export const loadConfig = async (): Promise<PlayerConfig> => {
   try {
@@ -15,7 +16,9 @@ export const loadConfig = async (): Promise<PlayerConfig> => {
   }
 }
 
-export const saveConfig = async (config: PlayerConfig): Promise<PlayerConfig> => {
+export const saveConfig = async (
+  config: PlayerConfig
+): Promise<PlayerConfig> => {
   const next = {
     ...config,
     updatedAt: new Date().toISOString()

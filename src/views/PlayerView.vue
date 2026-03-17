@@ -1,6 +1,9 @@
 <template>
   <div class="player-stage">
-    <div class="player-media" v-if="!privacyEnabled && !safeMode">
+    <div
+      class="player-media"
+      v-if="displayEnabled && !overlayVisible && !safeMode"
+    >
       <img
         v-if="currentItem?.type === 'image'"
         :src="currentSource"
@@ -9,7 +12,6 @@
       />
       <video
         v-else-if="currentItem?.type === 'video'"
-        ref="videoRef"
         :src="currentSource"
         :muted="currentItem?.mute ?? false"
         autoplay
@@ -19,16 +21,27 @@
       />
       <iframe
         v-else-if="currentItem?.type === 'web'"
-        ref="webRef"
         :src="currentSource"
         @load="onWebLoaded"
       ></iframe>
     </div>
 
-    <div v-if="privacyEnabled" class="player-overlay">
+    <div v-if="!displayEnabled" class="player-overlay">
       <div>
-        <h2>Privacy Lid</h2>
-        <p>Display is paused.</p>
+        <h2>Display Disabled</h2>
+        <p>This monitor is currently disabled.</p>
+      </div>
+    </div>
+
+    <div v-else-if="overlayVisible" class="player-overlay">
+      <div>
+        <img
+          v-if="overlayImageSource"
+          :src="overlayImageSource"
+          :alt="effectiveDisplay.overlay.title"
+        />
+        <h2>{{ effectiveDisplay.overlay.title }}</h2>
+        <p>{{ effectiveDisplay.overlay.message }}</p>
       </div>
     </div>
 
@@ -51,50 +64,80 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { PlayerConfig, PlaylistItem } from '../shared/types'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { getFutaeApi } from '../shared/api'
 import { createDefaultConfig } from '../shared/defaults'
+import { getEffectiveDisplayConfig } from '../shared/player-config'
+import {
+  createPlaybackOrder,
+  firstPlayablePointer,
+  nextPlayablePointer
+} from '../shared/playback'
+import type { PlayerConfig, PlaylistItem } from '../shared/types'
 
-const api = window.futae
+const api = getFutaeApi()
+const displayId = new URLSearchParams(window.location.search).get('displayId')
 
 const config = ref<PlayerConfig>(createDefaultConfig())
 const currentIndex = ref(0)
 const safeModeMessage = ref('')
-const privacyEnabled = ref(false)
+const runtimeOverlayEnabled = ref(false)
 const webState = ref<'loading' | 'ready' | 'failed'>('ready')
+const playbackOrder = ref<number[]>([])
+const orderPointer = ref(0)
 
-const videoRef = ref<HTMLVideoElement | null>(null)
-const webRef = ref<HTMLIFrameElement | null>(null)
+const failedIndices = new Set<number>()
 
 let playbackTimer: number | null = null
 let webTimer: number | null = null
 let heartbeatTimer: number | null = null
 let removeConfigListener: (() => void) | null = null
-let removePrivacyListener: (() => void) | null = null
+let removeOverlayListener: (() => void) | null = null
 
 const safeModeUrl = new URL('/safe-mode.svg', window.location.origin).toString()
 
-const currentItem = computed(() => config.value.playlist[currentIndex.value] ?? null)
+const effectiveDisplay = computed(() =>
+  getEffectiveDisplayConfig(config.value, displayId)
+)
+const displayEnabled = computed(() => effectiveDisplay.value.enabled)
+const activePlaylist = computed(() => effectiveDisplay.value.playlist)
+const currentItem = computed(
+  () => activePlaylist.value[currentIndex.value] ?? null
+)
 const safeMode = computed(() => Boolean(safeModeMessage.value))
-const showWebFallback = computed(() => currentItem.value?.type === 'web' && webState.value === 'failed')
+const overlayVisible = computed(() => runtimeOverlayEnabled.value)
+const showWebFallback = computed(
+  () => currentItem.value?.type === 'web' && webState.value === 'failed'
+)
 
 const resolveSource = (src: string): string => {
   if (!src) {
     return ''
   }
-  if (src.startsWith('http') || src.startsWith('file://')) {
+  if (
+    src.startsWith('http') ||
+    src.startsWith('file://') ||
+    src.startsWith('/')
+  ) {
     return src
   }
   return api.utils.toFileUrl(src)
 }
 
-const currentSource = computed(() => (currentItem.value ? resolveSource(currentItem.value.src) : ''))
+const currentSource = computed(() =>
+  currentItem.value ? resolveSource(currentItem.value.src) : ''
+)
 const fallbackSource = computed(() => {
   if (!currentItem.value?.fallbackSrc) {
     return safeModeUrl
   }
   return resolveSource(currentItem.value.fallbackSrc)
 })
+const overlayImageSource = computed(() =>
+  effectiveDisplay.value.overlay.imageSrc
+    ? resolveSource(effectiveDisplay.value.overlay.imageSrc)
+    : ''
+)
 
 const clearPlaybackTimer = () => {
   if (playbackTimer) {
@@ -130,37 +173,18 @@ const startWebTimeout = () => {
     if (webState.value !== 'ready') {
       webState.value = 'failed'
     }
-  }, (Number.isFinite(config.value.webTimeoutSec) ? config.value.webTimeoutSec : 8) * 1000)
-}
-
-const stepNext = () => {
-  const playlist = config.value.playlist
-  if (playlist.length === 0) {
-    enterSafeMode('Playlist is empty.')
-    return
-  }
-
-  if (config.value.shuffle) {
-    currentIndex.value = Math.floor(Math.random() * playlist.length)
-    return
-  }
-
-  if (currentIndex.value + 1 < playlist.length) {
-    currentIndex.value += 1
-    return
-  }
-
-  if (config.value.loop) {
-    currentIndex.value = 0
-    return
-  }
-
-  enterSafeMode('Playback completed.')
+  }, config.value.webTimeoutSec * 1000)
 }
 
 const startPlaybackForItem = (item: PlaylistItem | null) => {
   clearPlaybackTimer()
   clearWebTimer()
+
+  if (!displayEnabled.value) {
+    safeModeMessage.value = ''
+    return
+  }
+
   if (!item) {
     enterSafeMode('Playlist is empty.')
     return
@@ -172,8 +196,6 @@ const startPlaybackForItem = (item: PlaylistItem | null) => {
   if (item.type === 'video') {
     if (item.durationSec) {
       scheduleNext(item.durationSec * 1000)
-    } else {
-      clearPlaybackTimer()
     }
     return
   }
@@ -182,8 +204,80 @@ const startPlaybackForItem = (item: PlaylistItem | null) => {
     startWebTimeout()
   }
 
-  const duration = item.durationSec ?? (Number.isFinite(config.value.defaultDurationSec) ? config.value.defaultDurationSec : 10)
-  scheduleNext(duration * 1000)
+  scheduleNext((item.durationSec ?? config.value.defaultDurationSec) * 1000)
+}
+
+const selectPointer = (pointer: number | null) => {
+  if (pointer === null) {
+    enterSafeMode('No playable items remain.')
+    return
+  }
+
+  orderPointer.value = pointer
+  currentIndex.value = playbackOrder.value[pointer] ?? 0
+  startPlaybackForItem(currentItem.value)
+}
+
+const resetPlayback = () => {
+  clearPlaybackTimer()
+  clearWebTimer()
+  failedIndices.clear()
+
+  if (!displayEnabled.value) {
+    safeModeMessage.value = ''
+    webState.value = 'ready'
+    return
+  }
+
+  if (activePlaylist.value.length === 0) {
+    enterSafeMode('Playlist is empty.')
+    return
+  }
+
+  playbackOrder.value = createPlaybackOrder(
+    activePlaylist.value.length,
+    config.value.shuffle
+  )
+  selectPointer(firstPlayablePointer(playbackOrder.value, failedIndices))
+}
+
+const moveToNextItem = (preserveFailures = false) => {
+  if (!displayEnabled.value) {
+    clearPlaybackTimer()
+    clearWebTimer()
+    return
+  }
+
+  if (!preserveFailures) {
+    failedIndices.clear()
+  }
+
+  const nextPointer = nextPlayablePointer(
+    playbackOrder.value,
+    orderPointer.value,
+    failedIndices
+  )
+  if (nextPointer !== null) {
+    selectPointer(nextPointer)
+    return
+  }
+
+  if (!config.value.loop) {
+    enterSafeMode(
+      preserveFailures ? 'No playable items remain.' : 'Playback completed.'
+    )
+    return
+  }
+
+  playbackOrder.value = createPlaybackOrder(
+    activePlaylist.value.length,
+    config.value.shuffle
+  )
+  selectPointer(firstPlayablePointer(playbackOrder.value, failedIndices))
+}
+
+const stepNext = () => {
+  moveToNextItem(false)
 }
 
 const onVideoEnded = () => {
@@ -191,7 +285,14 @@ const onVideoEnded = () => {
 }
 
 const onMediaError = () => {
-  enterSafeMode('Failed to load asset.')
+  failedIndices.add(currentIndex.value)
+
+  if (failedIndices.size >= activePlaylist.value.length) {
+    enterSafeMode('No playable items remain.')
+    return
+  }
+
+  moveToNextItem(true)
 }
 
 const onWebLoaded = () => {
@@ -200,11 +301,7 @@ const onWebLoaded = () => {
 
 const applyConfig = (next: PlayerConfig) => {
   config.value = next
-  privacyEnabled.value = next.mode === 'privacy'
-  if (currentIndex.value >= next.playlist.length) {
-    currentIndex.value = 0
-  }
-  startPlaybackForItem(currentItem.value)
+  resetPlayback()
 }
 
 const startHeartbeat = () => {
@@ -213,19 +310,17 @@ const startHeartbeat = () => {
   }, 5000)
 }
 
-watch(currentIndex, () => {
-  startPlaybackForItem(currentItem.value)
-})
-
 onMounted(async () => {
   applyConfig(await api.config.get())
   removeConfigListener = api.config.onUpdated((next) => {
     applyConfig(next)
   })
-  removePrivacyListener = api.player.onPrivacy((enabled) => {
-    privacyEnabled.value = enabled
+  removeOverlayListener = api.player.onOverlay((enabled) => {
+    runtimeOverlayEnabled.value = enabled
   })
 
+  const status = await api.player.status()
+  runtimeOverlayEnabled.value = status.overlayEnabled
   startHeartbeat()
 })
 
@@ -233,7 +328,7 @@ onBeforeUnmount(() => {
   clearPlaybackTimer()
   clearWebTimer()
   removeConfigListener?.()
-  removePrivacyListener?.()
+  removeOverlayListener?.()
   if (heartbeatTimer) {
     window.clearInterval(heartbeatTimer)
   }

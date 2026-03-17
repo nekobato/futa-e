@@ -4,7 +4,7 @@ import type { FutaeApi } from './shared/ipc'
 
 declare global {
   interface Window {
-    futae: FutaeApi
+    futae?: FutaeApi
   }
 }
 

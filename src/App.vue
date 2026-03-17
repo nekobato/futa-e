@@ -9,5 +9,6 @@
 import ControlView from './views/ControlView.vue'
 import PlayerView from './views/PlayerView.vue'
 
-const view = new URLSearchParams(window.location.search).get('view') ?? 'control'
+const view =
+  new URLSearchParams(window.location.search).get('view') ?? 'control'
 </script>

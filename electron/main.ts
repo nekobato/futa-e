@@ -1,27 +1,52 @@
-import { app, BrowserWindow, dialog, globalShortcut, ipcMain, screen } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  globalShortcut,
+  ipcMain,
+  screen
+} from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, extname, join } from 'node:path'
 import { promises as fs } from 'node:fs'
-import type { AssetType, CacheResult, PickedAsset, PlayerConfig, PlayerStatus } from '../src/shared/types'
+import type {
+  AssetType,
+  CacheResult,
+  DisplayInfo,
+  PickedAsset,
+  PlayerConfig,
+  PlayerStatus
+} from '../src/shared/types'
 import { coerceConfig, createDefaultConfig } from '../src/shared/defaults'
 import { loadConfig, saveConfig } from './config'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
-const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'])
+const IMAGE_EXTENSIONS = new Set([
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.gif',
+  '.webp',
+  '.bmp',
+  '.svg'
+])
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.webm', '.mkv', '.avi'])
 
 let controlWindow: BrowserWindow | null = null
 let playerWindows: BrowserWindow[] = []
 let currentConfig: PlayerConfig = createDefaultConfig()
-let privacyEnabled = false
+let overlayEnabled = false
 const heartbeatMap = new Map<number, number>()
 let heartbeatInterval: NodeJS.Timeout | null = null
 
 const getPreloadPath = () => join(__dirname, '../preload/index.js')
 
-const getRendererUrl = (view: string, params: Record<string, string> = {}): string => {
+const getRendererUrl = (
+  view: string,
+  params: Record<string, string> = {}
+): string => {
   const base =
     process.env.VITE_DEV_SERVER_URL ??
     pathToFileURL(join(app.getAppPath(), 'dist/index.html')).toString()
@@ -36,19 +61,33 @@ const inferAssetType = (filePath: string): AssetType | null => {
   return null
 }
 
-const pickFiles = async (kind: 'image' | 'video' | 'media' = 'media'): Promise<PickedAsset[]> => {
+const pickFiles = async (
+  kind: 'image' | 'video' | 'media' = 'media'
+): Promise<PickedAsset[]> => {
   const filters = [] as { name: string; extensions: string[] }[]
   if (kind === 'image' || kind === 'media') {
-    filters.push({ name: 'Images', extensions: Array.from(IMAGE_EXTENSIONS).map((ext) => ext.slice(1)) })
+    filters.push({
+      name: 'Images',
+      extensions: Array.from(IMAGE_EXTENSIONS).map((ext) => ext.slice(1))
+    })
   }
   if (kind === 'video' || kind === 'media') {
-    filters.push({ name: 'Videos', extensions: Array.from(VIDEO_EXTENSIONS).map((ext) => ext.slice(1)) })
+    filters.push({
+      name: 'Videos',
+      extensions: Array.from(VIDEO_EXTENSIONS).map((ext) => ext.slice(1))
+    })
   }
 
-  const result = await dialog.showOpenDialog(controlWindow ?? undefined, {
-    properties: ['openFile', 'multiSelections'],
+  const dialogOptions = {
+    properties: [
+      'openFile',
+      'multiSelections'
+    ] as Electron.OpenDialogOptions['properties'],
     filters
-  })
+  }
+  const result = controlWindow
+    ? await dialog.showOpenDialog(controlWindow, dialogOptions)
+    : await dialog.showOpenDialog(dialogOptions)
 
   if (result.canceled) {
     return []
@@ -63,9 +102,12 @@ const pickFiles = async (kind: 'image' | 'video' | 'media' = 'media'): Promise<P
 }
 
 const pickFolder = async (): Promise<PickedAsset[]> => {
-  const result = await dialog.showOpenDialog(controlWindow ?? undefined, {
-    properties: ['openDirectory']
-  })
+  const dialogOptions = {
+    properties: ['openDirectory'] as Electron.OpenDialogOptions['properties']
+  }
+  const result = controlWindow
+    ? await dialog.showOpenDialog(controlWindow, dialogOptions)
+    : await dialog.showOpenDialog(dialogOptions)
 
   if (result.canceled || result.filePaths.length === 0) {
     return []
@@ -83,7 +125,10 @@ const pickFolder = async (): Promise<PickedAsset[]> => {
     .filter((asset): asset is PickedAsset => Boolean(asset))
 }
 
-const downloadToFile = async (url: string, targetPath: string): Promise<void> => {
+const downloadToFile = async (
+  url: string,
+  targetPath: string
+): Promise<void> => {
   const response = await fetch(url)
   if (!response.ok) {
     throw new Error(`download failed: ${response.status}`)
@@ -92,7 +137,10 @@ const downloadToFile = async (url: string, targetPath: string): Promise<void> =>
   await fs.writeFile(targetPath, buffer)
 }
 
-const cacheRemoteAsset = async (url: string, type: AssetType): Promise<CacheResult | null> => {
+const cacheRemoteAsset = async (
+  url: string,
+  type: AssetType
+): Promise<CacheResult | null> => {
   if (type === 'web') {
     return null
   }
@@ -146,7 +194,11 @@ const stopHeartbeatMonitor = () => {
   heartbeatMap.clear()
 }
 
-const createWindow = (view: string, options: Electron.BrowserWindowConstructorOptions) => {
+const createWindow = (
+  view: string,
+  options: Electron.BrowserWindowConstructorOptions,
+  params: Record<string, string> = {}
+) => {
   const win = new BrowserWindow({
     ...options,
     webPreferences: {
@@ -156,8 +208,24 @@ const createWindow = (view: string, options: Electron.BrowserWindowConstructorOp
     }
   })
 
-  win.loadURL(getRendererUrl(view))
+  win.loadURL(getRendererUrl(view, params))
   return win
+}
+
+const listDisplays = (): DisplayInfo[] => {
+  const primaryDisplayId = screen.getPrimaryDisplay().id
+
+  return screen.getAllDisplays().map((display) => ({
+    id: String(display.id),
+    label: display.label?.trim() || `Display ${display.id}`,
+    isPrimary: display.id === primaryDisplayId,
+    bounds: {
+      x: display.bounds.x,
+      y: display.bounds.y,
+      width: display.bounds.width,
+      height: display.bounds.height
+    }
+  }))
 }
 
 const createControlWindow = () => {
@@ -175,18 +243,33 @@ const createControlWindow = () => {
 }
 
 const createPlayerWindows = () => {
-  const displays = screen.getAllDisplays()
-  playerWindows = displays.map((display, index) => {
-    const win = createWindow('player', {
-      x: display.bounds.x,
-      y: display.bounds.y,
-      width: display.bounds.width,
-      height: display.bounds.height,
-      fullscreen: true,
-      frame: false,
-      backgroundColor: '#000000',
-      show: true
-    })
+  const displays =
+    currentConfig.displayMode === 'per-display'
+      ? screen
+          .getAllDisplays()
+          .filter(
+            (display) =>
+              currentConfig.displays[String(display.id)]?.enabled !== false
+          )
+      : screen.getAllDisplays()
+
+  playerWindows = displays.map((display) => {
+    const win = createWindow(
+      'player',
+      {
+        x: display.bounds.x,
+        y: display.bounds.y,
+        width: display.bounds.width,
+        height: display.bounds.height,
+        fullscreen: true,
+        frame: false,
+        backgroundColor: '#000000',
+        show: true
+      },
+      {
+        displayId: String(display.id)
+      }
+    )
 
     win.setMenuBarVisibility(false)
     win.on('closed', () => {
@@ -202,7 +285,7 @@ const createPlayerWindows = () => {
 
     win.webContents.once('did-finish-load', () => {
       win.webContents.send('config:updated', currentConfig)
-      win.webContents.send('player:privacy', privacyEnabled)
+      win.webContents.send('player:overlay', overlayEnabled)
     })
 
     win.webContents.on('unresponsive', () => {
@@ -229,27 +312,36 @@ const closePlayerWindows = () => {
 
 const getStatus = (): PlayerStatus => ({
   running: playerWindows.length > 0,
-  displayCount: playerWindows.length
+  displayCount: playerWindows.length,
+  overlayEnabled
 })
 
 const updateConfig = async (next: PlayerConfig): Promise<PlayerConfig> => {
   const normalized = coerceConfig(next)
   currentConfig = await saveConfig(normalized)
-  privacyEnabled = currentConfig.mode === 'privacy'
+
+  if (playerWindows.length > 0) {
+    closePlayerWindows()
+    createPlayerWindows()
+  }
+
   broadcastConfig(currentConfig)
-  playerWindows.forEach((win) => win.webContents.send('player:privacy', privacyEnabled))
+  playerWindows.forEach((win) =>
+    win.webContents.send('player:overlay', overlayEnabled)
+  )
   return currentConfig
 }
 
 app.whenReady().then(async () => {
   currentConfig = await loadConfig()
-  privacyEnabled = currentConfig.mode === 'privacy'
 
   createControlWindow()
 
   globalShortcut.register('CommandOrControl+Shift+P', () => {
-    privacyEnabled = !privacyEnabled
-    playerWindows.forEach((win) => win.webContents.send('player:privacy', privacyEnabled))
+    overlayEnabled = !overlayEnabled
+    playerWindows.forEach((win) =>
+      win.webContents.send('player:overlay', overlayEnabled)
+    )
   })
 })
 
@@ -271,17 +363,25 @@ app.on('will-quit', () => {
 
 ipcMain.handle('config:get', () => currentConfig)
 
-ipcMain.handle('config:save', async (_event, next: PlayerConfig) => updateConfig(next))
+ipcMain.handle('config:save', async (_event, next: PlayerConfig) =>
+  updateConfig(next)
+)
 
-ipcMain.handle('assets:pick-files', async (_event, options?: { kind?: 'image' | 'video' | 'media' }) =>
-  pickFiles(options?.kind ?? 'media')
+ipcMain.handle(
+  'assets:pick-files',
+  async (_event, options?: { kind?: 'image' | 'video' | 'media' }) =>
+    pickFiles(options?.kind ?? 'media')
 )
 
 ipcMain.handle('assets:pick-folder', async () => pickFolder())
 
-ipcMain.handle('assets:cache-remote', async (_event, payload: { url: string; type: AssetType }) =>
-  cacheRemoteAsset(payload.url, payload.type)
+ipcMain.handle(
+  'assets:cache-remote',
+  async (_event, payload: { url: string; type: AssetType }) =>
+    cacheRemoteAsset(payload.url, payload.type)
 )
+
+ipcMain.handle('displays:list', async () => listDisplays())
 
 ipcMain.handle('player:start', async () => {
   if (playerWindows.length === 0) {
@@ -298,9 +398,11 @@ ipcMain.handle('player:stop', async () => {
 
 ipcMain.handle('player:status', async () => getStatus())
 
-ipcMain.handle('player:set-privacy', async (_event, enabled: boolean) => {
-  privacyEnabled = enabled
-  playerWindows.forEach((win) => win.webContents.send('player:privacy', enabled))
+ipcMain.handle('player:set-overlay', async (_event, enabled: boolean) => {
+  overlayEnabled = enabled
+  playerWindows.forEach((win) =>
+    win.webContents.send('player:overlay', enabled)
+  )
 })
 
 ipcMain.on('player:heartbeat', (event) => {

@@ -1,0 +1,7 @@
+PLAN.md
+dist
+dist-electron
+node_modules
+output
+playwright-report
+test-results

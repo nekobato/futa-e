@@ -16,22 +16,27 @@ const api: FutaeApi = {
     }
   },
   assets: {
-    pickFiles: (options?: AssetPickOptions) => ipcRenderer.invoke('assets:pick-files', options),
+    pickFiles: (options?: AssetPickOptions) =>
+      ipcRenderer.invoke('assets:pick-files', options),
     pickFolder: () => ipcRenderer.invoke('assets:pick-folder'),
     cacheRemote: (url: string, type: AssetType) =>
       ipcRenderer.invoke('assets:cache-remote', { url, type })
+  },
+  displays: {
+    list: () => ipcRenderer.invoke('displays:list')
   },
   player: {
     start: () => ipcRenderer.invoke('player:start'),
     stop: () => ipcRenderer.invoke('player:stop'),
     status: () => ipcRenderer.invoke('player:status'),
-    setPrivacy: (enabled: boolean) => ipcRenderer.invoke('player:set-privacy', enabled),
-    onPrivacy: (handler) => {
+    setOverlay: (enabled: boolean) =>
+      ipcRenderer.invoke('player:set-overlay', enabled),
+    onOverlay: (handler) => {
       const listener = (_event: unknown, enabled: boolean) => {
         handler(enabled)
       }
-      ipcRenderer.on('player:privacy', listener)
-      return () => ipcRenderer.removeListener('player:privacy', listener)
+      ipcRenderer.on('player:overlay', listener)
+      return () => ipcRenderer.removeListener('player:overlay', listener)
     },
     heartbeat: () => ipcRenderer.send('player:heartbeat')
   },
