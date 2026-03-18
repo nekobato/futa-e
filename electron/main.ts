@@ -171,6 +171,14 @@ const broadcastConfig = (config: PlayerConfig) => {
   })
 }
 
+const broadcastDisplays = () => {
+  const displays = listDisplays()
+
+  if (controlWindow && !controlWindow.isDestroyed()) {
+    controlWindow.webContents.send('displays:changed', displays)
+  }
+}
+
 const startHeartbeatMonitor = () => {
   if (heartbeatInterval) {
     return
@@ -337,6 +345,10 @@ app.whenReady().then(async () => {
 
   createControlWindow()
 
+  screen.on('display-added', broadcastDisplays)
+  screen.on('display-removed', broadcastDisplays)
+  screen.on('display-metrics-changed', broadcastDisplays)
+
   globalShortcut.register('CommandOrControl+Shift+P', () => {
     overlayEnabled = !overlayEnabled
     playerWindows.forEach((win) =>
@@ -359,6 +371,9 @@ app.on('activate', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll()
+  screen.removeListener('display-added', broadcastDisplays)
+  screen.removeListener('display-removed', broadcastDisplays)
+  screen.removeListener('display-metrics-changed', broadcastDisplays)
 })
 
 ipcMain.handle('config:get', () => currentConfig)

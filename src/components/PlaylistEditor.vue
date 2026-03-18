@@ -17,41 +17,52 @@
 
     <Divider />
 
-    <div class="row">
-      <label>URL</label>
+    <div class="field">
+      <label :for="urlInputId">URL</label>
       <InputText
+        :id="urlInputId"
         v-model="urlInput"
         placeholder="https://example.com/asset"
         class="w-full"
       />
     </div>
 
-    <div class="row">
-      <label>Type</label>
-      <Select
-        v-model="urlType"
-        :options="typeOptions"
-        optionLabel="label"
-        optionValue="value"
-        class="w-full"
-      />
-      <label>Duration (sec)</label>
-      <InputNumber
-        v-model="urlDuration"
-        :min="2"
-        :max="36000"
-        placeholder="auto"
-      />
+    <div class="field-grid field-grid-2">
+      <div class="field">
+        <label :for="urlTypeInputId">Type</label>
+        <Select
+          :inputId="urlTypeInputId"
+          v-model="urlType"
+          :options="typeOptions"
+          optionLabel="label"
+          optionValue="value"
+          class="w-full"
+        />
+      </div>
+
+      <div class="field">
+        <label :for="urlDurationInputId">Duration (sec)</label>
+        <InputNumber
+          :inputId="urlDurationInputId"
+          v-model="urlDuration"
+          :min="2"
+          :max="36000"
+          placeholder="auto"
+        />
+      </div>
     </div>
 
-    <div class="row">
+    <div class="field-inline">
+      <div class="field-copy">
+        <strong>Fallback Image</strong>
+        <p class="surface-note">{{ fallbackLabel }}</p>
+      </div>
       <Button
         label="Pick Fallback"
         icon="pi pi-image"
         severity="secondary"
         @click="pickFallback"
       />
-      <span class="playlist-meta">{{ fallbackLabel }}</span>
     </div>
 
     <Button label="Add URL" icon="pi pi-plus" @click="addUrl" />
@@ -78,57 +89,68 @@
         </div>
 
         <div class="playlist-fields">
-          <div class="row">
-            <label>Title</label>
+          <div class="field">
+            <label :for="`playlist-title-${item.id}`">Title</label>
             <InputText
+              :id="`playlist-title-${item.id}`"
               :modelValue="item.title"
               class="w-full"
               @update:modelValue="updateItem(index, { title: String($event) })"
             />
           </div>
 
-          <div class="row">
-            <label>Duration (sec)</label>
-            <InputNumber
-              :modelValue="item.durationSec ?? null"
-              :min="item.type === 'video' ? undefined : 2"
-              :max="36000"
-              placeholder="auto"
-              @update:modelValue="
-                updateItem(index, {
-                  durationSec: normalizeDuration(item.type, $event)
-                })
-              "
-            />
-            <template v-if="item.type === 'video'">
-              <label>Mute</label>
+          <div class="field-grid field-grid-2">
+            <div class="field">
+              <label :for="`playlist-duration-${item.id}`">Duration (sec)</label>
+              <InputNumber
+                :inputId="`playlist-duration-${item.id}`"
+                :modelValue="item.durationSec ?? null"
+                :min="item.type === 'video' ? undefined : 2"
+                :max="36000"
+                placeholder="auto"
+                @update:modelValue="
+                  updateItem(index, {
+                    durationSec: normalizeDuration(item.type, $event)
+                  })
+                "
+              />
+            </div>
+
+            <div v-if="item.type === 'video'" class="field-inline">
+              <label :for="`playlist-mute-${item.id}`">Mute</label>
               <ToggleSwitch
+                :inputId="`playlist-mute-${item.id}`"
                 :modelValue="item.mute ?? false"
                 @update:modelValue="
                   updateItem(index, { mute: Boolean($event) })
                 "
               />
-            </template>
+            </div>
           </div>
         </div>
 
-        <div class="row">
+        <div class="playlist-item-actions">
           <Button
             icon="pi pi-arrow-up"
             text
             severity="secondary"
+            aria-label="Move item up"
+            :disabled="index === 0"
             @click="moveItem(index, -1)"
           />
           <Button
             icon="pi pi-arrow-down"
             text
             severity="secondary"
+            aria-label="Move item down"
+            :disabled="index === playlist.length - 1"
             @click="moveItem(index, 1)"
           />
           <Button
             icon="pi pi-trash"
             text
             severity="danger"
+            aria-label="Remove item"
             @click="removeItem(index)"
           />
         </div>
@@ -155,6 +177,10 @@ const emit = defineEmits<{
 
 const api = getFutaeApi()
 
+const urlInputId = createId()
+const urlTypeInputId = createId()
+const urlDurationInputId = createId()
+
 const urlInput = ref('')
 const urlType = ref<AssetType>('image')
 const urlDuration = ref<number | null>(null)
@@ -167,7 +193,7 @@ const typeOptions = [
 ]
 
 const fallbackLabel = computed(() =>
-  urlFallback.value ? titleFromPath(urlFallback.value) : 'No fallback'
+  urlFallback.value ? titleFromPath(urlFallback.value) : 'No fallback selected'
 )
 
 const emitPlaylist = (next: PlaylistItem[]) => {
@@ -259,18 +285,13 @@ const addUrl = async () => {
 
 const updateItem = (index: number, patch: Partial<PlaylistItem>) => {
   const next = props.playlist.map((item, itemIndex) =>
-    itemIndex === index
-      ? {
-          ...item,
-          ...patch
-        }
-      : item
+    itemIndex === index ? { ...item, ...patch } : item
   )
   emitPlaylist(next)
 }
 
-const moveItem = (index: number, delta: number) => {
-  const nextIndex = index + delta
+const moveItem = (index: number, direction: -1 | 1) => {
+  const nextIndex = index + direction
   if (nextIndex < 0 || nextIndex >= props.playlist.length) {
     return
   }
@@ -282,6 +303,6 @@ const moveItem = (index: number, delta: number) => {
 }
 
 const removeItem = (index: number) => {
-  emitPlaylist(props.playlist.filter((_item, itemIndex) => itemIndex !== index))
+  emitPlaylist(props.playlist.filter((_, itemIndex) => itemIndex !== index))
 }
 </script>

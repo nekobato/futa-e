@@ -23,7 +23,14 @@ const api: FutaeApi = {
       ipcRenderer.invoke('assets:cache-remote', { url, type })
   },
   displays: {
-    list: () => ipcRenderer.invoke('displays:list')
+    list: () => ipcRenderer.invoke('displays:list'),
+    onChanged: (handler) => {
+      const listener = (_event: unknown, displays: unknown) => {
+        handler(displays as Parameters<typeof handler>[0])
+      }
+      ipcRenderer.on('displays:changed', listener)
+      return () => ipcRenderer.removeListener('displays:changed', listener)
+    }
   },
   player: {
     start: () => ipcRenderer.invoke('player:start'),

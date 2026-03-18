@@ -24,6 +24,7 @@ export type FutaeApi = {
   }
   displays: {
     list: () => Promise<DisplayInfo[]>
+    onChanged: (handler: (displays: DisplayInfo[]) => void) => () => void
   }
   player: {
     start: () => Promise<PlayerStatus>
