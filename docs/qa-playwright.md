@@ -31,5 +31,4 @@ Playwright は `playwright.config.ts` の `webServer` 設定を使い、`pnpm de
 
 - control view の `モニターを個別に設定する` 切り替え
 - broken media の skip
-- `displayMode = 'per-display'` 時の display ごとの playlist 適用
-- `displayMode = 'per-display'` 時の display ごとの overlay 適用
+- playlist の `perDisplay = true` 時の display ごとの playlist 適用

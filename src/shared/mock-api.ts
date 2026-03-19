@@ -10,11 +10,9 @@ import { coerceConfig, createDefaultConfig } from './defaults'
 import { countEnabledDisplays, ensureDisplayConfigs } from './player-config'
 
 const CONFIG_KEY = 'futae:mock:config'
-const OVERLAY_KEY = 'futae:mock:overlay'
 const STATUS_KEY = 'futae:mock:status'
 
 const CONFIG_EVENT = 'futae:mock:config'
-const OVERLAY_EVENT = 'futae:mock:overlay'
 
 let cachedScreenDetails: Promise<WindowManagementScreenDetails | null> | null =
   null
@@ -80,19 +78,16 @@ const readDisplays = async (): Promise<DisplayInfo[]> => {
   return currentDisplayFallback()
 }
 
-const readOverlay = (): boolean =>
-  window.localStorage.getItem(OVERLAY_KEY) === 'true'
-
 const readStatus = (): PlayerStatus => {
   const stored = window.localStorage.getItem(STATUS_KEY)
   if (!stored) {
-    return { running: false, displayCount: 0, overlayEnabled: readOverlay() }
+    return { running: false, displayCount: 0 }
   }
 
   try {
     return JSON.parse(stored) as PlayerStatus
   } catch {
-    return { running: false, displayCount: 0, overlayEnabled: readOverlay() }
+    return { running: false, displayCount: 0 }
   }
 }
 
@@ -121,19 +116,11 @@ const writeConfig = async (config: PlayerConfig): Promise<PlayerConfig> => {
   if (status.running) {
     writeStatus({
       running: true,
-      displayCount: countEnabledDisplays(normalized, displays),
-      overlayEnabled: status.overlayEnabled
+      displayCount: countEnabledDisplays(normalized, displays)
     })
   }
 
   return normalized
-}
-
-const writeOverlay = (enabled: boolean) => {
-  window.localStorage.setItem(OVERLAY_KEY, String(enabled))
-  window.dispatchEvent(
-    new CustomEvent<boolean>(OVERLAY_EVENT, { detail: enabled })
-  )
 }
 
 const noopPick = async (_options?: AssetPickOptions): Promise<never[]> => []
@@ -206,43 +193,15 @@ export const createBrowserMockApi = (): FutaeApi => {
         const displays = await readDisplays()
         return writeStatus({
           running: true,
-          displayCount: countEnabledDisplays(await readConfig(), displays),
-          overlayEnabled: readOverlay()
+          displayCount: countEnabledDisplays(await readConfig(), displays)
         })
       },
       stop: async () =>
         writeStatus({
           running: false,
-          displayCount: 0,
-          overlayEnabled: readOverlay()
+          displayCount: 0
         }),
       status: async () => readStatus(),
-      setOverlay: async (enabled: boolean) => {
-        writeOverlay(enabled)
-        writeStatus({
-          ...readStatus(),
-          overlayEnabled: enabled
-        })
-      },
-      onOverlay: (handler) => {
-        const onOverlay = (event: Event) => {
-          const customEvent = event as CustomEvent<boolean>
-          handler(customEvent.detail)
-        }
-        const onStorage = (event: StorageEvent) => {
-          if (event.key === OVERLAY_KEY) {
-            handler(readOverlay())
-          }
-        }
-
-        window.addEventListener(OVERLAY_EVENT, onOverlay)
-        window.addEventListener('storage', onStorage)
-
-        return () => {
-          window.removeEventListener(OVERLAY_EVENT, onOverlay)
-          window.removeEventListener('storage', onStorage)
-        }
-      },
       heartbeat: () => undefined
     },
     utils: {

@@ -3,7 +3,9 @@ import { createDefaultConfig } from '../../src/shared/defaults'
 import {
   countEnabledDisplays,
   ensureDisplayConfigs,
-  getEffectiveDisplayConfig
+  getActivePlaylist,
+  getEffectiveDisplayConfig,
+  getPlaylistById
 } from '../../src/shared/player-config'
 import type { DisplayInfo } from '../../src/shared/types'
 
@@ -23,52 +25,116 @@ const displays: DisplayInfo[] = [
 ]
 
 describe('player-config helpers', () => {
-  it('seeds missing display configs from the shared config', () => {
+  it('seeds missing display configs from all shared playlists', () => {
     const config = createDefaultConfig()
-    config.playlist = [
+    config.playlists = [
       {
-        id: 'item-1',
-        type: 'image',
-        title: 'Item 1',
-        src: '/safe-mode.svg'
+        id: 'shared',
+        name: 'プレイリスト 1',
+        perDisplay: true,
+        items: [
+          {
+            id: 'item-1',
+            type: 'image',
+            title: 'Item 1',
+            src: '/safe-mode.svg'
+          }
+        ]
+      },
+      {
+        id: 'secondary',
+        name: 'プレイリスト 2',
+        perDisplay: false,
+        items: []
       }
     ]
-    config.overlay.title = 'Shared Overlay'
 
     const next = ensureDisplayConfigs(config, displays)
 
     expect(Object.keys(next.displays)).toEqual(['1', '2'])
-    expect(next.displays['1']).toMatchObject({
-      enabled: true,
-      overlay: {
-        title: 'Shared Overlay'
-      }
-    })
-    expect(next.displays['1'].playlist).toHaveLength(1)
-    expect(next.displays['1'].playlist).not.toBe(config.playlist)
+    expect(next.displays['1'].enabled).toBe(true)
+    expect(next.displays['1'].playlists).toHaveLength(2)
+    expect(
+      getPlaylistById(next.displays['1'].playlists, 'shared').items
+    ).toHaveLength(1)
+    expect(
+      getPlaylistById(next.displays['1'].playlists, 'secondary').name
+    ).toBe('プレイリスト 2')
+    expect(next.displays['1'].playlists).not.toBe(config.playlists)
   })
 
-  it('uses shared settings while display mode is mirror', () => {
-    const config = ensureDisplayConfigs(createDefaultConfig(), displays)
-    config.overlay.title = 'Mirror Overlay'
-    config.playlist = [
+  it('returns the active playlist by id', () => {
+    const config = createDefaultConfig()
+    config.playlists = [
       {
-        id: 'shared-1',
-        type: 'image',
-        title: 'Shared',
-        src: '/safe-mode.svg'
+        id: 'playlist-1',
+        name: 'プレイリスト 1',
+        perDisplay: false,
+        items: []
+      },
+      {
+        id: 'playlist-2',
+        name: 'プレイリスト 2',
+        perDisplay: true,
+        items: []
       }
     ]
+    config.activePlaylistId = 'playlist-2'
+
+    expect(getActivePlaylist(config).id).toBe('playlist-2')
+  })
+
+  it('uses shared settings while the active playlist is shared across displays', () => {
+    const config = ensureDisplayConfigs(createDefaultConfig(), displays)
+    config.playlists = [
+      {
+        id: 'playlist-1',
+        name: 'プレイリスト 1',
+        perDisplay: false,
+        items: []
+      },
+      {
+        id: 'playlist-2',
+        name: 'プレイリスト 2',
+        perDisplay: false,
+        items: [
+          {
+            id: 'shared-2',
+            type: 'image',
+            title: 'Shared',
+            src: '/safe-mode.svg'
+          }
+        ]
+      }
+    ]
+    config.activePlaylistId = 'playlist-2'
+    config.displays = ensureDisplayConfigs(config, displays).displays
 
     const effective = getEffectiveDisplayConfig(config, '2')
 
-    expect(effective.overlay.title).toBe('Mirror Overlay')
-    expect(effective.playlist[0]?.id).toBe('shared-1')
+    expect(
+      getPlaylistById(effective.playlists, 'playlist-2').items[0]?.id
+    ).toBe('shared-2')
   })
 
-  it('counts enabled per-display windows only when per-display mode is active', () => {
+  it('counts enabled per-display windows only when the active playlist is per-display', () => {
     const config = ensureDisplayConfigs(createDefaultConfig(), displays)
-    config.displayMode = 'per-display'
+    config.playlists = [
+      {
+        id: 'playlist-1',
+        name: 'プレイリスト 1',
+        perDisplay: false,
+        items: []
+      },
+      {
+        id: 'playlist-2',
+        name: 'プレイリスト 2',
+        perDisplay: true,
+        items: []
+      }
+    ]
+    config.activePlaylistId = 'playlist-2'
+    config.displays = ensureDisplayConfigs(config, displays).displays
     config.displays['2'].enabled = false
 
     expect(countEnabledDisplays(config, displays)).toBe(1)

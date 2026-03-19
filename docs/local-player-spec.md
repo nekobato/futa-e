@@ -10,7 +10,7 @@
 - ローカル環境だけで蓋絵プレイヤーとして動作できること
 - 画像、動画、Web を playlist として再生できること
 - 複数モニター環境で、まずは同一表示、その後に個別設定へ拡張できること
-- mode のような抽象カテゴリではなく、再生内容、表示時間、overlay を個別設定できること
+- 再生内容と表示時間を playlist として管理し、将来複数 playlist を持てること
 
 ## 再生対象
 
@@ -41,15 +41,6 @@ playlist item は少なくとも次の情報を持つ。
 - `mute` は item 単位の ON/OFF のみを持つ
 - 音量値そのものは OS または PC 側に任せる
 
-## Overlay
-
-- overlay は runtime で ON/OFF する
-- overlay が ON の間も playlist の時間は止めず、そのまま進める
-- overlay を解除した時点では、その時の現在位置を表示する
-- overlay の見た目は設定で個別に変更できる
-- overlay 設定は少なくとも `title`、`message`、`imageSrc` を持つ
-- 共通 overlay 設定と display ごとの overlay 設定を持てる
-
 ## Web の扱い
 
 - `web` には `webTimeoutSec` を適用する
@@ -73,9 +64,9 @@ playlist item は少なくとも次の情報を持つ。
 ## マルチモニター
 
 - 初期状態では、存在する全モニターに同一内容を表示する
-- UI に `モニターを個別に設定する` の ToggleSwitch を用意する
-- ToggleSwitch が OFF の場合は共通設定のみを使う
-- ToggleSwitch が ON の場合は、現在存在するモニター一覧を取得し、各モニターごとに設定項目を表示する
+- 各 playlist に `モニターを個別に設定する` の ToggleSwitch を用意する
+- 先頭の playlist の ToggleSwitch が OFF の場合は共通設定のみを使う
+- 先頭の playlist の ToggleSwitch が ON の場合は、現在存在するモニター一覧を取得し、各モニターごとに設定項目を表示する
 - モニターごとの識別子には `Electron.Display.id` を使う
 - 個別設定が存在しないモニターは共通設定へフォールバックする
 
@@ -84,34 +75,33 @@ playlist item は少なくとも次の情報を持つ。
 ローカル設定の形式は、当面は次のような形を想定する。
 
 ```ts
-type OverlayConfig = {
-  title: string
-  message: string
-  imageSrc?: string
+type PlaylistConfig = {
+  id: string
+  name: string
+  perDisplay: boolean
+  items: PlaylistItem[]
 }
 
 type PlayerConfig = {
   version: 1
-  playlist: PlaylistItem[]
+  playlists: PlaylistConfig[]
   loop: boolean
   shuffle: boolean
   defaultDurationSec: number
   webTimeoutSec: number
-  overlay: OverlayConfig
-  displayMode: 'mirror' | 'per-display'
   displays: Record<string, DisplayConfig>
   updatedAt: string
 }
 
 type DisplayConfig = {
   enabled: boolean
-  playlist: PlaylistItem[]
-  overlay: OverlayConfig
+  playlists: PlaylistConfig[]
 }
 ```
 
-- `displayMode = 'mirror'` なら全モニターで共通設定を使う
-- `displayMode = 'per-display'` なら `displays` の設定を優先する
+- 先頭の playlist の `perDisplay = false` なら全モニターで共通設定を使う
+- 先頭の playlist の `perDisplay = true` なら `displays` の設定を優先する
+- 現在の UI は先頭の playlist を編集対象にする
 - 将来 Manifest を定義する場合も、このローカル設定との差分が小さくなるように寄せる
 
 ## cache と offline

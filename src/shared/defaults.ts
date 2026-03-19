@@ -1,41 +1,55 @@
 import type {
   AssetType,
   DisplayConfig,
-  OverlayConfig,
   PlayerConfig,
+  PlaylistConfig,
   PlaylistItem
 } from './types'
 import { clampNumber, createId, isRecord, titleFromPath } from './utils'
 
-export const createDefaultOverlayConfig = (): OverlayConfig => ({
-  title: 'Overlay',
-  message: 'Display is covered.'
+const DEFAULT_PLAYLIST_NAME = 'プレイリスト 1'
+const LEGACY_OVERLAY_PLAYLIST_NAME = 'プレイリスト 2'
+
+export const createDefaultPlaylistConfig = (
+  name = DEFAULT_PLAYLIST_NAME
+): PlaylistConfig => ({
+  id: createId(),
+  name,
+  perDisplay: false,
+  items: []
 })
 
-export const createDefaultConfig = (): PlayerConfig => ({
-  version: 1,
-  playlist: [],
-  loop: true,
-  shuffle: false,
-  defaultDurationSec: 10,
-  webTimeoutSec: 8,
-  overlay: createDefaultOverlayConfig(),
-  displayMode: 'mirror',
-  displays: {},
-  updatedAt: new Date().toISOString()
-})
+export const createDefaultPlaylists = (): PlaylistConfig[] => [
+  createDefaultPlaylistConfig()
+]
+
+export const createDefaultConfig = (): PlayerConfig => {
+  const playlists = createDefaultPlaylists()
+
+  return {
+    version: 1,
+    activePlaylistId: playlists[0]?.id ?? createId(),
+    playlists,
+    loop: true,
+    shuffle: false,
+    defaultDurationSec: 10,
+    webTimeoutSec: 8,
+    displays: {},
+    updatedAt: new Date().toISOString()
+  }
+}
 
 const isAssetType = (value: unknown): value is AssetType =>
   value === 'image' || value === 'video' || value === 'web'
 
-const clonePlaylist = (playlist: PlaylistItem[]): PlaylistItem[] =>
+const clonePlaylistItems = (playlist: PlaylistItem[]): PlaylistItem[] =>
   playlist.map((item) => ({ ...item }))
 
-const cloneOverlay = (overlay: OverlayConfig): OverlayConfig => ({
-  title: overlay.title,
-  message: overlay.message,
-  imageSrc: overlay.imageSrc
-})
+export const clonePlaylists = (playlists: PlaylistConfig[]): PlaylistConfig[] =>
+  playlists.map((playlist) => ({
+    ...playlist,
+    items: clonePlaylistItems(playlist.items)
+  }))
 
 const normalizeItem = (item: unknown): PlaylistItem | null => {
   if (!isRecord(item)) {
@@ -69,47 +83,137 @@ const normalizeItem = (item: unknown): PlaylistItem | null => {
   }
 }
 
-const normalizeOverlayConfig = (
-  value: unknown,
-  fallback: OverlayConfig
-): OverlayConfig => {
-  if (!isRecord(value)) {
-    return cloneOverlay(fallback)
+const normalizePlaylistItems = (value: unknown): PlaylistItem[] =>
+  Array.isArray(value)
+    ? value
+        .map((item) => normalizeItem(item))
+        .filter((item): item is PlaylistItem => Boolean(item))
+    : []
+
+const normalizeLegacyOverlayItems = (value: unknown): PlaylistItem[] => {
+  if (Array.isArray(value)) {
+    return normalizePlaylistItems(value)
   }
 
-  return {
-    title:
-      typeof value.title === 'string' && value.title.trim().length > 0
-        ? value.title
-        : fallback.title,
-    message:
-      typeof value.message === 'string' && value.message.trim().length > 0
-        ? value.message
-        : fallback.message,
-    imageSrc:
-      typeof value.imageSrc === 'string' ? value.imageSrc : fallback.imageSrc
+  if (!isRecord(value)) {
+    return []
   }
+
+  if (typeof value.imageSrc === 'string' && value.imageSrc.trim().length > 0) {
+    return [
+      {
+        id: createId(),
+        type: 'image',
+        title: titleFromPath(value.imageSrc),
+        src: value.imageSrc,
+        durationSec: undefined,
+        mute: false
+      }
+    ]
+  }
+
+  return []
+}
+
+const normalizePlaylistConfig = (
+  value: unknown,
+  fallbackName: string,
+  fallbackPerDisplay = false
+): PlaylistConfig | null => {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  const items = normalizePlaylistItems(value.items)
+
+  return {
+    id: typeof value.id === 'string' ? value.id : createId(),
+    name:
+      typeof value.name === 'string' && value.name.trim().length > 0
+        ? value.name
+        : fallbackName,
+    perDisplay:
+      typeof value.perDisplay === 'boolean'
+        ? value.perDisplay
+        : fallbackPerDisplay,
+    items
+  }
+}
+
+const normalizePlaylists = (
+  value: unknown,
+  fallback: PlaylistConfig[]
+): PlaylistConfig[] => {
+  if (!Array.isArray(value)) {
+    return clonePlaylists(fallback)
+  }
+
+  const playlists = value
+    .map((playlist, index) =>
+      normalizePlaylistConfig(
+        playlist,
+        `プレイリスト ${index + 1}`,
+        fallback[index]?.perDisplay ?? false
+      )
+    )
+    .filter((playlist): playlist is PlaylistConfig => Boolean(playlist))
+
+  return playlists.length > 0 ? playlists : clonePlaylists(fallback)
+}
+
+const normalizeLegacyPlaylists = (
+  playlistValue: unknown,
+  overlayValue: unknown,
+  fallback: PlaylistConfig[],
+  legacyPerDisplay: boolean
+): PlaylistConfig[] => {
+  const primaryItems = normalizePlaylistItems(playlistValue)
+  const overlayItems = normalizeLegacyOverlayItems(overlayValue)
+
+  const nextPlaylists: PlaylistConfig[] = [
+    {
+      id: createId(),
+      name: DEFAULT_PLAYLIST_NAME,
+      perDisplay: legacyPerDisplay,
+      items:
+        primaryItems.length > 0
+          ? primaryItems
+          : clonePlaylistItems(fallback[0]?.items ?? [])
+    }
+  ]
+
+  if (overlayItems.length > 0) {
+    nextPlaylists.push({
+      id: createId(),
+      name: LEGACY_OVERLAY_PLAYLIST_NAME,
+      perDisplay: legacyPerDisplay,
+      items: overlayItems
+    })
+  }
+
+  return nextPlaylists
 }
 
 const normalizeDisplayConfig = (
   value: unknown,
-  fallbackPlaylist: PlaylistItem[],
-  fallbackOverlay: OverlayConfig
+  fallbackPlaylists: PlaylistConfig[]
 ): DisplayConfig | null => {
   if (!isRecord(value)) {
     return null
   }
 
-  const playlist = Array.isArray(value.playlist)
-    ? value.playlist
-        .map((item) => normalizeItem(item))
-        .filter((item): item is PlaylistItem => Boolean(item))
-    : clonePlaylist(fallbackPlaylist)
+  const playlists = Array.isArray(value.playlists)
+    ? normalizePlaylists(value.playlists, fallbackPlaylists)
+    : normalizeLegacyPlaylists(
+        value.playlist,
+        value.overlay,
+        fallbackPlaylists,
+        fallbackPlaylists[0]?.perDisplay ?? false
+      )
 
   return {
     enabled: typeof value.enabled === 'boolean' ? value.enabled : true,
-    playlist,
-    overlay: normalizeOverlayConfig(value.overlay, fallbackOverlay)
+    playlists
   }
 }
 
@@ -120,14 +224,23 @@ export const coerceConfig = (raw: unknown): PlayerConfig => {
     return base
   }
 
-  const playlist = Array.isArray(raw.playlist)
-    ? raw.playlist
-        .map((item) => normalizeItem(item))
-        .filter((item): item is PlaylistItem => Boolean(item))
-    : base.playlist
+  const legacyPerDisplay = raw.displayMode === 'per-display'
+  const playlists = Array.isArray(raw.playlists)
+    ? normalizePlaylists(raw.playlists, base.playlists)
+    : normalizeLegacyPlaylists(
+        raw.playlist,
+        raw.overlay,
+        base.playlists,
+        legacyPerDisplay
+      )
 
   const loop = typeof raw.loop === 'boolean' ? raw.loop : base.loop
   const shuffle = typeof raw.shuffle === 'boolean' ? raw.shuffle : base.shuffle
+  const activePlaylistId =
+    typeof raw.activePlaylistId === 'string' &&
+    playlists.some((playlist) => playlist.id === raw.activePlaylistId)
+      ? raw.activePlaylistId
+      : (playlists[0]?.id ?? base.activePlaylistId)
   const defaultDurationSec =
     typeof raw.defaultDurationSec === 'number'
       ? clampNumber(raw.defaultDurationSec, 2, 36000)
@@ -136,15 +249,10 @@ export const coerceConfig = (raw: unknown): PlayerConfig => {
     typeof raw.webTimeoutSec === 'number'
       ? clampNumber(raw.webTimeoutSec, 2, 120)
       : base.webTimeoutSec
-  const overlay = normalizeOverlayConfig(raw.overlay, base.overlay)
-  const displayMode =
-    raw.displayMode === 'mirror' || raw.displayMode === 'per-display'
-      ? raw.displayMode
-      : base.displayMode
   const displays = isRecord(raw.displays)
     ? Object.entries(raw.displays).reduce<Record<string, DisplayConfig>>(
         (accumulator, [displayId, value]) => {
-          const normalized = normalizeDisplayConfig(value, playlist, overlay)
+          const normalized = normalizeDisplayConfig(value, playlists)
           if (normalized) {
             accumulator[displayId] = normalized
           }
@@ -156,13 +264,12 @@ export const coerceConfig = (raw: unknown): PlayerConfig => {
 
   return {
     version: 1,
-    playlist,
+    activePlaylistId,
+    playlists,
     loop,
     shuffle,
     defaultDurationSec,
     webTimeoutSec,
-    overlay,
-    displayMode,
     displays,
     updatedAt:
       typeof raw.updatedAt === 'string' ? raw.updatedAt : base.updatedAt

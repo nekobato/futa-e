@@ -33,12 +33,24 @@ test('shows per-display editors when individual monitor settings are enabled', a
 
   await page.goto('/?view=control')
 
-  await expect(page.getByText('Detected displays: 2')).toBeVisible()
+  await expect(page.getByText('接続ディスプレイ 2 台')).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'プレイリスト' })
+  ).toBeVisible()
   await expect(page.getByText('Built-in Display')).toBeVisible()
   await expect(page.getByText('Studio Display')).toBeVisible()
+  await expect(page.getByTestId('playlist-list-item')).toHaveCount(1)
+
+  await page.getByTestId('playlist-add-button').click()
+
+  await expect(page.getByTestId('playlist-list-item')).toHaveCount(2)
+  await expect(page.getByLabel('プレイリスト名')).toHaveValue('プレイリスト 2')
 
   await page.getByTestId('per-display-controls').getByRole('switch').click()
 
-  await expect(page.getByText('Shared Playlist')).toBeVisible()
-  await expect(page.locator('[data-testid^="display-card-"]')).toHaveCount(2)
+  await expect(page.getByRole('tab', { name: '共通' })).toBeVisible()
+  await expect(
+    page.getByRole('tab', { name: 'Built-in Display' })
+  ).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Studio Display' })).toBeVisible()
 })

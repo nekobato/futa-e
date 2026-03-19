@@ -2,7 +2,7 @@
   <div class="player-stage">
     <div
       class="player-media"
-      v-if="displayEnabled && !overlayVisible && !safeMode"
+      v-if="!missingDisplayTarget && displayEnabled && !safeMode"
     >
       <img
         v-if="currentItem?.type === 'image'"
@@ -26,38 +26,38 @@
       ></iframe>
     </div>
 
-    <div v-if="!displayEnabled" class="player-overlay">
+    <div v-if="missingDisplayTarget" class="player-overlay">
       <div>
-        <h2>Display Disabled</h2>
-        <p>This monitor is currently disabled.</p>
+        <h2>利用できません</h2>
+        <p>
+          このプレイリストはモニター個別設定です。対象ディスプレイを検出できないため、再生できません。
+        </p>
       </div>
     </div>
 
-    <div v-else-if="overlayVisible" class="player-overlay">
+    <div v-else-if="!displayEnabled" class="player-overlay">
       <div>
-        <img
-          v-if="overlayImageSource"
-          :src="overlayImageSource"
-          :alt="effectiveDisplay.overlay.title"
-        />
-        <h2>{{ effectiveDisplay.overlay.title }}</h2>
-        <p>{{ effectiveDisplay.overlay.message }}</p>
+        <h2>表示停止中</h2>
+        <p>このディスプレイは現在無効です。</p>
       </div>
     </div>
 
     <div v-else-if="safeMode" class="player-overlay">
       <div>
-        <img :src="safeModeUrl" alt="Safe mode" />
-        <h2>Safe Mode</h2>
+        <img :src="safeModeUrl" alt="セーフモード" />
+        <h2>セーフモード</h2>
         <p>{{ safeModeMessage }}</p>
       </div>
     </div>
 
     <div v-else-if="showWebFallback" class="player-overlay">
       <div>
-        <img :src="fallbackSource" alt="Fallback" />
-        <h2>Web Fallback</h2>
-        <p>Web content timed out. Switched to fallback.</p>
+        <img :src="fallbackSource" alt="フォールバック表示" />
+        <h2>Web フォールバック</h2>
+        <p>
+          Web
+          コンテンツの読込がタイムアウトしたため、フォールバックへ切り替えました。
+        </p>
       </div>
     </div>
   </div>
@@ -67,21 +67,24 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { getFutaeApi } from '../shared/api'
 import { createDefaultConfig } from '../shared/defaults'
-import { getEffectiveDisplayConfig } from '../shared/player-config'
+import {
+  getActivePlaylist,
+  getEffectiveDisplayConfig
+} from '../shared/player-config'
 import {
   createPlaybackOrder,
   firstPlayablePointer,
   nextPlayablePointer
 } from '../shared/playback'
-import type { PlayerConfig, PlaylistItem } from '../shared/types'
+import type { DisplayInfo, PlayerConfig, PlaylistItem } from '../shared/types'
 
 const api = getFutaeApi()
 const displayId = new URLSearchParams(window.location.search).get('displayId')
 
 const config = ref<PlayerConfig>(createDefaultConfig())
+const detectedDisplays = ref<DisplayInfo[]>([])
 const currentIndex = ref(0)
 const safeModeMessage = ref('')
-const runtimeOverlayEnabled = ref(false)
 const webState = ref<'loading' | 'ready' | 'failed'>('ready')
 const playbackOrder = ref<number[]>([])
 const orderPointer = ref(0)
@@ -92,20 +95,34 @@ let playbackTimer: number | null = null
 let webTimer: number | null = null
 let heartbeatTimer: number | null = null
 let removeConfigListener: (() => void) | null = null
-let removeOverlayListener: (() => void) | null = null
+let removeDisplayListener: (() => void) | null = null
 
 const safeModeUrl = new URL('/safe-mode.svg', window.location.origin).toString()
 
 const effectiveDisplay = computed(() =>
   getEffectiveDisplayConfig(config.value, displayId)
 )
-const displayEnabled = computed(() => effectiveDisplay.value.enabled)
-const activePlaylist = computed(() => effectiveDisplay.value.playlist)
+const activePlaylistConfig = computed(() => getActivePlaylist(config.value))
+const missingDisplayTarget = computed(
+  () =>
+    activePlaylistConfig.value.perDisplay &&
+    (!displayId ||
+      !detectedDisplays.value.some((display) => display.id === displayId))
+)
+const displayEnabled = computed(
+  () => !missingDisplayTarget.value && effectiveDisplay.value.enabled
+)
+const activePlaylist = computed(
+  () =>
+    getActivePlaylist({
+      activePlaylistId: config.value.activePlaylistId,
+      playlists: effectiveDisplay.value.playlists
+    }).items
+)
 const currentItem = computed(
   () => activePlaylist.value[currentIndex.value] ?? null
 )
 const safeMode = computed(() => Boolean(safeModeMessage.value))
-const overlayVisible = computed(() => runtimeOverlayEnabled.value)
 const showWebFallback = computed(
   () => currentItem.value?.type === 'web' && webState.value === 'failed'
 )
@@ -133,11 +150,6 @@ const fallbackSource = computed(() => {
   }
   return resolveSource(currentItem.value.fallbackSrc)
 })
-const overlayImageSource = computed(() =>
-  effectiveDisplay.value.overlay.imageSrc
-    ? resolveSource(effectiveDisplay.value.overlay.imageSrc)
-    : ''
-)
 
 const clearPlaybackTimer = () => {
   if (playbackTimer) {
@@ -180,13 +192,19 @@ const startPlaybackForItem = (item: PlaylistItem | null) => {
   clearPlaybackTimer()
   clearWebTimer()
 
+  if (missingDisplayTarget.value) {
+    safeModeMessage.value = ''
+    webState.value = 'ready'
+    return
+  }
+
   if (!displayEnabled.value) {
     safeModeMessage.value = ''
     return
   }
 
   if (!item) {
-    enterSafeMode('Playlist is empty.')
+    enterSafeMode('プレイリストが空です。')
     return
   }
 
@@ -209,7 +227,7 @@ const startPlaybackForItem = (item: PlaylistItem | null) => {
 
 const selectPointer = (pointer: number | null) => {
   if (pointer === null) {
-    enterSafeMode('No playable items remain.')
+    enterSafeMode('再生可能な項目がありません。')
     return
   }
 
@@ -223,6 +241,12 @@ const resetPlayback = () => {
   clearWebTimer()
   failedIndices.clear()
 
+  if (missingDisplayTarget.value) {
+    safeModeMessage.value = ''
+    webState.value = 'ready'
+    return
+  }
+
   if (!displayEnabled.value) {
     safeModeMessage.value = ''
     webState.value = 'ready'
@@ -230,7 +254,7 @@ const resetPlayback = () => {
   }
 
   if (activePlaylist.value.length === 0) {
-    enterSafeMode('Playlist is empty.')
+    enterSafeMode('プレイリストが空です。')
     return
   }
 
@@ -264,7 +288,7 @@ const moveToNextItem = (preserveFailures = false) => {
 
   if (!config.value.loop) {
     enterSafeMode(
-      preserveFailures ? 'No playable items remain.' : 'Playback completed.'
+      preserveFailures ? '再生可能な項目がありません。' : '再生が完了しました。'
     )
     return
   }
@@ -288,7 +312,7 @@ const onMediaError = () => {
   failedIndices.add(currentIndex.value)
 
   if (failedIndices.size >= activePlaylist.value.length) {
-    enterSafeMode('No playable items remain.')
+    enterSafeMode('再生可能な項目がありません。')
     return
   }
 
@@ -304,6 +328,11 @@ const applyConfig = (next: PlayerConfig) => {
   resetPlayback()
 }
 
+const syncDisplays = (displays: DisplayInfo[]) => {
+  detectedDisplays.value = displays
+  resetPlayback()
+}
+
 const startHeartbeat = () => {
   heartbeatTimer = window.setInterval(() => {
     api.player.heartbeat()
@@ -311,16 +340,14 @@ const startHeartbeat = () => {
 }
 
 onMounted(async () => {
+  syncDisplays(await api.displays.list())
   applyConfig(await api.config.get())
   removeConfigListener = api.config.onUpdated((next) => {
     applyConfig(next)
   })
-  removeOverlayListener = api.player.onOverlay((enabled) => {
-    runtimeOverlayEnabled.value = enabled
+  removeDisplayListener = api.displays.onChanged((displays) => {
+    syncDisplays(displays)
   })
-
-  const status = await api.player.status()
-  runtimeOverlayEnabled.value = status.overlayEnabled
   startHeartbeat()
 })
 
@@ -328,7 +355,7 @@ onBeforeUnmount(() => {
   clearPlaybackTimer()
   clearWebTimer()
   removeConfigListener?.()
-  removeOverlayListener?.()
+  removeDisplayListener?.()
   if (heartbeatTimer) {
     window.clearInterval(heartbeatTimer)
   }

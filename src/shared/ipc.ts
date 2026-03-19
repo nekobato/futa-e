@@ -30,8 +30,6 @@ export type FutaeApi = {
     start: () => Promise<PlayerStatus>
     stop: () => Promise<PlayerStatus>
     status: () => Promise<PlayerStatus>
-    setOverlay: (enabled: boolean) => Promise<void>
-    onOverlay: (handler: (enabled: boolean) => void) => () => void
     heartbeat: () => void
   }
   utils: {

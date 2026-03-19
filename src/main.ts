@@ -4,15 +4,17 @@ import Aura from '@primeuix/themes/aura'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
-import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
-import Card from 'primevue/card'
+import Checkbox from 'primevue/checkbox'
 import Divider from 'primevue/divider'
 import Tag from 'primevue/tag'
-import Accordion from 'primevue/accordion'
-import AccordionPanel from 'primevue/accordionpanel'
-import AccordionHeader from 'primevue/accordionheader'
-import AccordionContent from 'primevue/accordioncontent'
+import Splitter from 'primevue/splitter'
+import SplitterPanel from 'primevue/splitterpanel'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import TabPanels from 'primevue/tabpanels'
+import TabPanel from 'primevue/tabpanel'
 
 import 'primeicons/primeicons.css'
 import './styles.css'
@@ -29,14 +31,16 @@ app.use(PrimeVue, {
 app.component('Button', Button)
 app.component('InputText', InputText)
 app.component('InputNumber', InputNumber)
-app.component('Select', Select)
 app.component('ToggleSwitch', ToggleSwitch)
-app.component('Card', Card)
+app.component('Checkbox', Checkbox)
 app.component('Divider', Divider)
 app.component('Tag', Tag)
-app.component('Accordion', Accordion)
-app.component('AccordionPanel', AccordionPanel)
-app.component('AccordionHeader', AccordionHeader)
-app.component('AccordionContent', AccordionContent)
+app.component('Splitter', Splitter)
+app.component('SplitterPanel', SplitterPanel)
+app.component('Tabs', Tabs)
+app.component('TabList', TabList)
+app.component('Tab', Tab)
+app.component('TabPanels', TabPanels)
+app.component('TabPanel', TabPanel)
 
 app.mount('#app')

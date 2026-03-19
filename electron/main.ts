@@ -1,11 +1,4 @@
-import {
-  app,
-  BrowserWindow,
-  dialog,
-  globalShortcut,
-  ipcMain,
-  screen
-} from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, extname, join } from 'node:path'
 import { promises as fs } from 'node:fs'
@@ -18,6 +11,10 @@ import type {
   PlayerStatus
 } from '../src/shared/types'
 import { coerceConfig, createDefaultConfig } from '../src/shared/defaults'
+import {
+  getActivePlaylist,
+  isPerDisplayPlaylist
+} from '../src/shared/player-config'
 import { loadConfig, saveConfig } from './config'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -37,7 +34,6 @@ const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.webm', '.mkv', '.avi'])
 let controlWindow: BrowserWindow | null = null
 let playerWindows: BrowserWindow[] = []
 let currentConfig: PlayerConfig = createDefaultConfig()
-let overlayEnabled = false
 const heartbeatMap = new Map<number, number>()
 let heartbeatInterval: NodeJS.Timeout | null = null
 
@@ -251,15 +247,15 @@ const createControlWindow = () => {
 }
 
 const createPlayerWindows = () => {
-  const displays =
-    currentConfig.displayMode === 'per-display'
-      ? screen
-          .getAllDisplays()
-          .filter(
-            (display) =>
-              currentConfig.displays[String(display.id)]?.enabled !== false
-          )
-      : screen.getAllDisplays()
+  const activePlaylist = getActivePlaylist(currentConfig)
+  const displays = isPerDisplayPlaylist(activePlaylist)
+    ? screen
+        .getAllDisplays()
+        .filter(
+          (display) =>
+            currentConfig.displays[String(display.id)]?.enabled !== false
+        )
+    : screen.getAllDisplays()
 
   playerWindows = displays.map((display) => {
     const win = createWindow(
@@ -293,7 +289,6 @@ const createPlayerWindows = () => {
 
     win.webContents.once('did-finish-load', () => {
       win.webContents.send('config:updated', currentConfig)
-      win.webContents.send('player:overlay', overlayEnabled)
     })
 
     win.webContents.on('unresponsive', () => {
@@ -320,8 +315,7 @@ const closePlayerWindows = () => {
 
 const getStatus = (): PlayerStatus => ({
   running: playerWindows.length > 0,
-  displayCount: playerWindows.length,
-  overlayEnabled
+  displayCount: playerWindows.length
 })
 
 const updateConfig = async (next: PlayerConfig): Promise<PlayerConfig> => {
@@ -334,9 +328,6 @@ const updateConfig = async (next: PlayerConfig): Promise<PlayerConfig> => {
   }
 
   broadcastConfig(currentConfig)
-  playerWindows.forEach((win) =>
-    win.webContents.send('player:overlay', overlayEnabled)
-  )
   return currentConfig
 }
 
@@ -348,13 +339,6 @@ app.whenReady().then(async () => {
   screen.on('display-added', broadcastDisplays)
   screen.on('display-removed', broadcastDisplays)
   screen.on('display-metrics-changed', broadcastDisplays)
-
-  globalShortcut.register('CommandOrControl+Shift+P', () => {
-    overlayEnabled = !overlayEnabled
-    playerWindows.forEach((win) =>
-      win.webContents.send('player:overlay', overlayEnabled)
-    )
-  })
 })
 
 app.on('window-all-closed', () => {
@@ -370,7 +354,6 @@ app.on('activate', () => {
 })
 
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll()
   screen.removeListener('display-added', broadcastDisplays)
   screen.removeListener('display-removed', broadcastDisplays)
   screen.removeListener('display-metrics-changed', broadcastDisplays)
@@ -412,13 +395,6 @@ ipcMain.handle('player:stop', async () => {
 })
 
 ipcMain.handle('player:status', async () => getStatus())
-
-ipcMain.handle('player:set-overlay', async (_event, enabled: boolean) => {
-  overlayEnabled = enabled
-  playerWindows.forEach((win) =>
-    win.webContents.send('player:overlay', enabled)
-  )
-})
 
 ipcMain.on('player:heartbeat', (event) => {
   heartbeatMap.set(event.sender.id, Date.now())

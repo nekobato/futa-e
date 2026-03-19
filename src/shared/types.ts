@@ -1,11 +1,4 @@
 export type AssetType = 'image' | 'video' | 'web'
-export type DisplayMode = 'mirror' | 'per-display'
-
-export type OverlayConfig = {
-  title: string
-  message: string
-  imageSrc?: string
-}
 
 export type PlaylistItem = {
   id: string
@@ -18,15 +11,21 @@ export type PlaylistItem = {
   mute?: boolean
 }
 
+export type PlaylistConfig = {
+  id: string
+  name: string
+  perDisplay: boolean
+  items: PlaylistItem[]
+}
+
 export type PlayerConfig = {
   version: 1
-  playlist: PlaylistItem[]
+  activePlaylistId: string
+  playlists: PlaylistConfig[]
   loop: boolean
   shuffle: boolean
   defaultDurationSec: number
   webTimeoutSec: number
-  overlay: OverlayConfig
-  displayMode: DisplayMode
   displays: Record<string, DisplayConfig>
   updatedAt: string
 }
@@ -34,7 +33,6 @@ export type PlayerConfig = {
 export type PlayerStatus = {
   running: boolean
   displayCount: number
-  overlayEnabled: boolean
 }
 
 export type PickedAsset = {
@@ -63,6 +61,5 @@ export type DisplayInfo = {
 
 export type DisplayConfig = {
   enabled: boolean
-  playlist: PlaylistItem[]
-  overlay: OverlayConfig
+  playlists: PlaylistConfig[]
 }

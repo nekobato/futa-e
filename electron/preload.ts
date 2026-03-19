@@ -36,15 +36,6 @@ const api: FutaeApi = {
     start: () => ipcRenderer.invoke('player:start'),
     stop: () => ipcRenderer.invoke('player:stop'),
     status: () => ipcRenderer.invoke('player:status'),
-    setOverlay: (enabled: boolean) =>
-      ipcRenderer.invoke('player:set-overlay', enabled),
-    onOverlay: (handler) => {
-      const listener = (_event: unknown, enabled: boolean) => {
-        handler(enabled)
-      }
-      ipcRenderer.on('player:overlay', listener)
-      return () => ipcRenderer.removeListener('player:overlay', listener)
-    },
     heartbeat: () => ipcRenderer.send('player:heartbeat')
   },
   utils: {
