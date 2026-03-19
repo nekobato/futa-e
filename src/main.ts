@@ -1,6 +1,5 @@
 import { createApp } from 'vue'
 import PrimeVue from 'primevue/config'
-import Aura from '@primeuix/themes/aura'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
@@ -19,12 +18,17 @@ import TabPanel from 'primevue/tabpanel'
 import 'primeicons/primeicons.css'
 import './styles.css'
 import App from './App.vue'
+import { QuietAtelier } from './theme/quietAtelier'
 
 const app = createApp(App)
 
 app.use(PrimeVue, {
   theme: {
-    preset: Aura
+    preset: QuietAtelier,
+    options: {
+      darkModeSelector: '.p-dark',
+      cssLayer: false
+    }
   }
 })
 
