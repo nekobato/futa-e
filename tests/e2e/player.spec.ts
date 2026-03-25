@@ -18,6 +18,10 @@ test('skips broken media items and advances to the next playable item', async ({
         id: 'shared',
         name: 'プレイリスト 1',
         perDisplay: false,
+        loop: true,
+        shuffle: false,
+        defaultDurationSec: 10,
+        webTimeoutSec: 8,
         items: [
           {
             id: 'bad',
@@ -34,10 +38,6 @@ test('skips broken media items and advances to the next playable item', async ({
         ]
       }
     ],
-    loop: true,
-    shuffle: false,
-    defaultDurationSec: 10,
-    webTimeoutSec: 8,
     displays: {},
     updatedAt: '2026-03-17T00:00:00.000Z'
   })
@@ -85,6 +85,10 @@ test('uses display-specific playlists when the primary playlist is per-display',
         id: 'shared',
         name: 'プレイリスト 1',
         perDisplay: true,
+        loop: true,
+        shuffle: false,
+        defaultDurationSec: 10,
+        webTimeoutSec: 8,
         items: [
           {
             id: 'shared-1',
@@ -98,6 +102,10 @@ test('uses display-specific playlists when the primary playlist is per-display',
         id: 'secondary',
         name: 'プレイリスト 2',
         perDisplay: false,
+        loop: true,
+        shuffle: false,
+        defaultDurationSec: 10,
+        webTimeoutSec: 8,
         items: [
           {
             id: 'ignored-secondary',
@@ -108,10 +116,6 @@ test('uses display-specific playlists when the primary playlist is per-display',
         ]
       }
     ],
-    loop: true,
-    shuffle: false,
-    defaultDurationSec: 10,
-    webTimeoutSec: 8,
     displays: {
       'display-1-0-0-1920x1080': {
         enabled: true,
@@ -120,6 +124,10 @@ test('uses display-specific playlists when the primary playlist is per-display',
             id: 'shared',
             name: 'プレイリスト 1',
             perDisplay: true,
+            loop: true,
+            shuffle: false,
+            defaultDurationSec: 10,
+            webTimeoutSec: 8,
             items: [
               {
                 id: 'display-1',
@@ -138,6 +146,10 @@ test('uses display-specific playlists when the primary playlist is per-display',
             id: 'shared',
             name: 'プレイリスト 1',
             perDisplay: true,
+            loop: true,
+            shuffle: false,
+            defaultDurationSec: 10,
+            webTimeoutSec: 8,
             items: [
               {
                 id: 'display-2',
@@ -151,6 +163,10 @@ test('uses display-specific playlists when the primary playlist is per-display',
             id: 'secondary',
             name: 'プレイリスト 2',
             perDisplay: false,
+            loop: true,
+            shuffle: false,
+            defaultDurationSec: 10,
+            webTimeoutSec: 8,
             items: [
               {
                 id: 'ignored-display-2-secondary',
@@ -201,6 +217,10 @@ test('does not play when a per-display playlist cannot resolve the target displa
         id: 'shared',
         name: 'プレイリスト 1',
         perDisplay: true,
+        loop: true,
+        shuffle: false,
+        defaultDurationSec: 10,
+        webTimeoutSec: 8,
         items: [
           {
             id: 'shared-1',
@@ -211,10 +231,6 @@ test('does not play when a per-display playlist cannot resolve the target displa
         ]
       }
     ],
-    loop: true,
-    shuffle: false,
-    defaultDurationSec: 10,
-    webTimeoutSec: 8,
     displays: {},
     updatedAt: '2026-03-17T00:00:00.000Z'
   })

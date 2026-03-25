@@ -9,13 +9,34 @@ import { clampNumber, createId, isRecord, titleFromPath } from './utils'
 
 const DEFAULT_PLAYLIST_NAME = 'プレイリスト 1'
 const LEGACY_OVERLAY_PLAYLIST_NAME = 'プレイリスト 2'
+const DEFAULT_PLAYLIST_LOOP = true
+const DEFAULT_PLAYLIST_SHUFFLE = false
+const DEFAULT_PLAYLIST_DURATION_SEC = 10
+const DEFAULT_PLAYLIST_WEB_TIMEOUT_SEC = 8
+
+type PlaylistPlaybackDefaults = Pick<
+  PlaylistConfig,
+  'loop' | 'shuffle' | 'defaultDurationSec' | 'webTimeoutSec'
+>
+
+const createPlaylistPlaybackDefaults = (
+  overrides: Partial<PlaylistPlaybackDefaults> = {}
+): PlaylistPlaybackDefaults => ({
+  loop: DEFAULT_PLAYLIST_LOOP,
+  shuffle: DEFAULT_PLAYLIST_SHUFFLE,
+  defaultDurationSec: DEFAULT_PLAYLIST_DURATION_SEC,
+  webTimeoutSec: DEFAULT_PLAYLIST_WEB_TIMEOUT_SEC,
+  ...overrides
+})
 
 export const createDefaultPlaylistConfig = (
-  name = DEFAULT_PLAYLIST_NAME
+  name = DEFAULT_PLAYLIST_NAME,
+  playbackDefaults: Partial<PlaylistPlaybackDefaults> = {}
 ): PlaylistConfig => ({
   id: createId(),
   name,
   perDisplay: false,
+  ...createPlaylistPlaybackDefaults(playbackDefaults),
   items: []
 })
 
@@ -30,10 +51,6 @@ export const createDefaultConfig = (): PlayerConfig => {
     version: 1,
     activePlaylistId: playlists[0]?.id ?? createId(),
     playlists,
-    loop: true,
-    shuffle: false,
-    defaultDurationSec: 10,
-    webTimeoutSec: 8,
     displays: {},
     updatedAt: new Date().toISOString()
   }
@@ -118,7 +135,8 @@ const normalizeLegacyOverlayItems = (value: unknown): PlaylistItem[] => {
 const normalizePlaylistConfig = (
   value: unknown,
   fallbackName: string,
-  fallbackPerDisplay = false
+  fallbackPerDisplay = false,
+  playbackDefaults: PlaylistPlaybackDefaults = createPlaylistPlaybackDefaults()
 ): PlaylistConfig | null => {
   if (!isRecord(value)) {
     return null
@@ -136,13 +154,27 @@ const normalizePlaylistConfig = (
       typeof value.perDisplay === 'boolean'
         ? value.perDisplay
         : fallbackPerDisplay,
+    loop: typeof value.loop === 'boolean' ? value.loop : playbackDefaults.loop,
+    shuffle:
+      typeof value.shuffle === 'boolean'
+        ? value.shuffle
+        : playbackDefaults.shuffle,
+    defaultDurationSec:
+      typeof value.defaultDurationSec === 'number'
+        ? clampNumber(value.defaultDurationSec, 2, 36000)
+        : playbackDefaults.defaultDurationSec,
+    webTimeoutSec:
+      typeof value.webTimeoutSec === 'number'
+        ? clampNumber(value.webTimeoutSec, 2, 120)
+        : playbackDefaults.webTimeoutSec,
     items
   }
 }
 
 const normalizePlaylists = (
   value: unknown,
-  fallback: PlaylistConfig[]
+  fallback: PlaylistConfig[],
+  legacyPlaybackDefaults = createPlaylistPlaybackDefaults()
 ): PlaylistConfig[] => {
   if (!Array.isArray(value)) {
     return clonePlaylists(fallback)
@@ -153,7 +185,17 @@ const normalizePlaylists = (
       normalizePlaylistConfig(
         playlist,
         `プレイリスト ${index + 1}`,
-        fallback[index]?.perDisplay ?? false
+        fallback[index]?.perDisplay ?? false,
+        {
+          loop: fallback[index]?.loop ?? legacyPlaybackDefaults.loop,
+          shuffle: fallback[index]?.shuffle ?? legacyPlaybackDefaults.shuffle,
+          defaultDurationSec:
+            fallback[index]?.defaultDurationSec ??
+            legacyPlaybackDefaults.defaultDurationSec,
+          webTimeoutSec:
+            fallback[index]?.webTimeoutSec ??
+            legacyPlaybackDefaults.webTimeoutSec
+        }
       )
     )
     .filter((playlist): playlist is PlaylistConfig => Boolean(playlist))
@@ -165,7 +207,8 @@ const normalizeLegacyPlaylists = (
   playlistValue: unknown,
   overlayValue: unknown,
   fallback: PlaylistConfig[],
-  legacyPerDisplay: boolean
+  legacyPerDisplay: boolean,
+  playbackDefaults: PlaylistPlaybackDefaults
 ): PlaylistConfig[] => {
   const primaryItems = normalizePlaylistItems(playlistValue)
   const overlayItems = normalizeLegacyOverlayItems(overlayValue)
@@ -175,6 +218,7 @@ const normalizeLegacyPlaylists = (
       id: createId(),
       name: DEFAULT_PLAYLIST_NAME,
       perDisplay: legacyPerDisplay,
+      ...playbackDefaults,
       items:
         primaryItems.length > 0
           ? primaryItems
@@ -187,6 +231,7 @@ const normalizeLegacyPlaylists = (
       id: createId(),
       name: LEGACY_OVERLAY_PLAYLIST_NAME,
       perDisplay: legacyPerDisplay,
+      ...playbackDefaults,
       items: overlayItems
     })
   }
@@ -208,7 +253,13 @@ const normalizeDisplayConfig = (
         value.playlist,
         value.overlay,
         fallbackPlaylists,
-        fallbackPlaylists[0]?.perDisplay ?? false
+        fallbackPlaylists[0]?.perDisplay ?? false,
+        createPlaylistPlaybackDefaults({
+          loop: fallbackPlaylists[0]?.loop,
+          shuffle: fallbackPlaylists[0]?.shuffle,
+          defaultDurationSec: fallbackPlaylists[0]?.defaultDurationSec,
+          webTimeoutSec: fallbackPlaylists[0]?.webTimeoutSec
+        })
       )
 
   return {
@@ -224,31 +275,35 @@ export const coerceConfig = (raw: unknown): PlayerConfig => {
     return base
   }
 
+  const legacyPlaybackDefaults = createPlaylistPlaybackDefaults({
+    loop: typeof raw.loop === 'boolean' ? raw.loop : undefined,
+    shuffle: typeof raw.shuffle === 'boolean' ? raw.shuffle : undefined,
+    defaultDurationSec:
+      typeof raw.defaultDurationSec === 'number'
+        ? clampNumber(raw.defaultDurationSec, 2, 36000)
+        : undefined,
+    webTimeoutSec:
+      typeof raw.webTimeoutSec === 'number'
+        ? clampNumber(raw.webTimeoutSec, 2, 120)
+        : undefined
+  })
+
   const legacyPerDisplay = raw.displayMode === 'per-display'
   const playlists = Array.isArray(raw.playlists)
-    ? normalizePlaylists(raw.playlists, base.playlists)
+    ? normalizePlaylists(raw.playlists, base.playlists, legacyPlaybackDefaults)
     : normalizeLegacyPlaylists(
         raw.playlist,
         raw.overlay,
         base.playlists,
-        legacyPerDisplay
+        legacyPerDisplay,
+        legacyPlaybackDefaults
       )
 
-  const loop = typeof raw.loop === 'boolean' ? raw.loop : base.loop
-  const shuffle = typeof raw.shuffle === 'boolean' ? raw.shuffle : base.shuffle
   const activePlaylistId =
     typeof raw.activePlaylistId === 'string' &&
     playlists.some((playlist) => playlist.id === raw.activePlaylistId)
       ? raw.activePlaylistId
       : (playlists[0]?.id ?? base.activePlaylistId)
-  const defaultDurationSec =
-    typeof raw.defaultDurationSec === 'number'
-      ? clampNumber(raw.defaultDurationSec, 2, 36000)
-      : base.defaultDurationSec
-  const webTimeoutSec =
-    typeof raw.webTimeoutSec === 'number'
-      ? clampNumber(raw.webTimeoutSec, 2, 120)
-      : base.webTimeoutSec
   const displays = isRecord(raw.displays)
     ? Object.entries(raw.displays).reduce<Record<string, DisplayConfig>>(
         (accumulator, [displayId, value]) => {
@@ -266,10 +321,6 @@ export const coerceConfig = (raw: unknown): PlayerConfig => {
     version: 1,
     activePlaylistId,
     playlists,
-    loop,
-    shuffle,
-    defaultDurationSec,
-    webTimeoutSec,
     displays,
     updatedAt:
       typeof raw.updatedAt === 'string' ? raw.updatedAt : base.updatedAt

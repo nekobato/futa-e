@@ -54,109 +54,54 @@
             <h2>再生とディスプレイ</h2>
           </div>
           <p class="section-copy">
-            全体の再生挙動と、接続中ディスプレイの有効状態をここで整えます。
+            接続中ディスプレイの有効状態をここで整えます。
           </p>
         </div>
 
-        <div class="settings-grid settings-grid-compact">
-          <section class="settings-block">
-            <header class="subsection-heading">
-              <div>
-                <h3>再生設定</h3>
-                <p>すべてのプレイリストに共通する再生条件です。</p>
-              </div>
-            </header>
-
-            <div class="field-grid field-grid-2">
-              <div class="field-inline">
-                <label :for="loopInputId">ループ再生</label>
-                <ToggleSwitch
-                  :inputId="loopInputId"
-                  v-model="config.loop"
-                  @update:modelValue="markDirty"
-                />
-              </div>
-
-              <div class="field-inline">
-                <label :for="shuffleInputId">シャッフル</label>
-                <ToggleSwitch
-                  :inputId="shuffleInputId"
-                  v-model="config.shuffle"
-                  @update:modelValue="markDirty"
-                />
-              </div>
+        <section class="settings-block">
+          <header class="subsection-heading">
+            <div>
+              <h3>ディスプレイ</h3>
+              <p>有効を切ると、個別設定を使う再生時だけ対象から外れます。</p>
             </div>
+          </header>
 
-            <div class="field-grid field-grid-2">
-              <div class="field">
-                <label :for="defaultDurationInputId">既定表示時間（秒）</label>
-                <InputNumber
-                  :inputId="defaultDurationInputId"
-                  v-model="config.defaultDurationSec"
-                  :min="2"
-                  :max="36000"
-                  @update:modelValue="markDirty"
+          <div v-if="displayInfos.length > 0" class="display-list">
+            <div
+              v-for="display in displayInfos"
+              :key="display.id"
+              class="display-summary display-summary-dense"
+            >
+              <div class="display-copy">
+                <strong>{{ display.label }}</strong>
+                <span class="surface-note">
+                  {{ display.bounds.width }} x {{ display.bounds.height }}
+                </span>
+              </div>
+
+              <div class="display-summary-actions">
+                <Tag
+                  :value="display.isPrimary ? 'メイン' : '画面'"
+                  severity="secondary"
                 />
-              </div>
-
-              <div class="field">
-                <label :for="webTimeoutInputId">Web 読込待機時間（秒）</label>
-                <InputNumber
-                  :inputId="webTimeoutInputId"
-                  v-model="config.webTimeoutSec"
-                  :min="2"
-                  :max="120"
-                  @update:modelValue="markDirty"
-                />
-              </div>
-            </div>
-          </section>
-
-          <section class="settings-block">
-            <header class="subsection-heading">
-              <div>
-                <h3>ディスプレイ</h3>
-                <p>有効を切ると、個別設定を使う再生時だけ対象から外れます。</p>
-              </div>
-            </header>
-
-            <div v-if="displayInfos.length > 0" class="display-list">
-              <div
-                v-for="display in displayInfos"
-                :key="display.id"
-                class="display-summary display-summary-dense"
-              >
-                <div class="display-copy">
-                  <strong>{{ display.label }}</strong>
-                  <span class="surface-note">
-                    {{ display.bounds.width }} x {{ display.bounds.height }}
-                  </span>
-                </div>
-
-                <div class="display-summary-actions">
-                  <Tag
-                    :value="display.isPrimary ? 'メイン' : '画面'"
-                    severity="secondary"
+                <div class="field-inline field-inline-compact">
+                  <label :for="displayEnabledInputId(display.id)">有効</label>
+                  <ToggleSwitch
+                    :inputId="displayEnabledInputId(display.id)"
+                    :modelValue="config.displays[display.id]?.enabled ?? true"
+                    @update:modelValue="
+                      setDisplayEnabled(display.id, Boolean($event))
+                    "
                   />
-                  <div class="field-inline field-inline-compact">
-                    <label :for="displayEnabledInputId(display.id)">有効</label>
-                    <ToggleSwitch
-                      :inputId="displayEnabledInputId(display.id)"
-                      :modelValue="config.displays[display.id]?.enabled ?? true"
-                      @update:modelValue="
-                        setDisplayEnabled(display.id, Boolean($event))
-                      "
-                    />
-                  </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <p v-else class="surface-note">
-              ディスプレイはまだ検出できておりません。
-            </p>
-          </section>
-        </div>
+          <p v-else class="surface-note">
+            ディスプレイはまだ検出できておりません。
+          </p>
+        </section>
       </section>
 
       <Divider />
@@ -335,6 +280,66 @@
                   </div>
                 </div>
 
+                <div class="field-grid field-grid-2">
+                  <div class="field-inline">
+                    <label :for="playlistLoopInputId">ループ再生</label>
+                    <ToggleSwitch
+                      :inputId="playlistLoopInputId"
+                      :modelValue="selectedPlaylist.loop"
+                      @update:modelValue="
+                        updateSelectedPlaylistSettings({
+                          loop: Boolean($event)
+                        })
+                      "
+                    />
+                  </div>
+
+                  <div class="field-inline">
+                    <label :for="playlistShuffleInputId">シャッフル</label>
+                    <ToggleSwitch
+                      :inputId="playlistShuffleInputId"
+                      :modelValue="selectedPlaylist.shuffle"
+                      @update:modelValue="
+                        updateSelectedPlaylistSettings({
+                          shuffle: Boolean($event)
+                        })
+                      "
+                    />
+                  </div>
+                </div>
+
+                <div class="field-grid field-grid-2">
+                  <div class="field">
+                    <label :for="playlistDefaultDurationInputId"
+                      >既定表示時間（秒）</label
+                    >
+                    <InputNumber
+                      :inputId="playlistDefaultDurationInputId"
+                      :modelValue="selectedPlaylist.defaultDurationSec"
+                      :min="2"
+                      :max="36000"
+                      @update:modelValue="
+                        updateSelectedPlaylistDefaultDuration($event)
+                      "
+                    />
+                  </div>
+
+                  <div class="field">
+                    <label :for="playlistWebTimeoutInputId"
+                      >Web 読込待機時間（秒）</label
+                    >
+                    <InputNumber
+                      :inputId="playlistWebTimeoutInputId"
+                      :modelValue="selectedPlaylist.webTimeoutSec"
+                      :min="2"
+                      :max="120"
+                      @update:modelValue="
+                        updateSelectedPlaylistWebTimeout($event)
+                      "
+                    />
+                  </div>
+                </div>
+
                 <div
                   v-if="selectedPlaylist.perDisplay"
                   class="playlist-tab-shell"
@@ -363,7 +368,9 @@
 
                           <PlaylistEditor
                             :playlist="selectedPlaylist.items"
-                            :default-duration-sec="config.defaultDurationSec"
+                            :default-duration-sec="
+                              selectedPlaylist.defaultDurationSec
+                            "
                             @update:playlist="updateSelectedSharedPlaylist"
                             @changed="markDirty"
                           />
@@ -418,7 +425,9 @@
 
                           <PlaylistEditor
                             :playlist="displayPlaylist(display.id).items"
-                            :default-duration-sec="config.defaultDurationSec"
+                            :default-duration-sec="
+                              displayPlaylist(display.id).defaultDurationSec
+                            "
                             @update:playlist="
                               (playlist) =>
                                 updateSelectedDisplayPlaylist(
@@ -437,7 +446,7 @@
                 <div v-else class="playlist-editor-shell">
                   <PlaylistEditor
                     :playlist="selectedPlaylist.items"
-                    :default-duration-sec="config.defaultDurationSec"
+                    :default-duration-sec="selectedPlaylist.defaultDurationSec"
                     @update:playlist="updateSelectedSharedPlaylist"
                     @changed="markDirty"
                   />
@@ -465,7 +474,8 @@ import {
   replacePlaylistById,
   replacePlaylistItemsById,
   replacePlaylistNameById,
-  replacePlaylistPerDisplayById
+  replacePlaylistPerDisplayById,
+  replacePlaylistSettingsById
 } from '../shared/player-config'
 import type {
   DisplayConfig,
@@ -479,12 +489,12 @@ import { createId } from '../shared/utils'
 
 const api = getFutaeApi()
 
-const loopInputId = 'control-loop'
-const shuffleInputId = 'control-shuffle'
-const defaultDurationInputId = 'control-default-duration'
-const webTimeoutInputId = 'control-web-timeout'
 const playlistNameInputId = 'control-playlist-name'
 const perDisplayInputId = 'control-playlist-per-display'
+const playlistLoopInputId = 'control-playlist-loop'
+const playlistShuffleInputId = 'control-playlist-shuffle'
+const playlistDefaultDurationInputId = 'control-playlist-default-duration'
+const playlistWebTimeoutInputId = 'control-playlist-web-timeout'
 
 const config = ref<PlayerConfig>(createDefaultConfig())
 const displayInfos = ref<DisplayInfo[]>([])
@@ -763,6 +773,50 @@ const toggleSelectedPlaylistPerDisplay = (enabled: boolean) => {
   )
   selectedPlaylistScope.value = 'shared'
   markDirty()
+}
+
+const updateSelectedPlaylistSettings = (
+  settings: Partial<
+    Pick<
+      PlaylistConfig,
+      'loop' | 'shuffle' | 'defaultDurationSec' | 'webTimeoutSec'
+    >
+  >
+) => {
+  config.value = ensureDisplayConfigs(
+    {
+      ...config.value,
+      playlists: replacePlaylistSettingsById(
+        config.value.playlists,
+        selectedPlaylist.value.id,
+        settings
+      )
+    },
+    displayInfos.value
+  )
+  markDirty()
+}
+
+const updateSelectedPlaylistDefaultDuration = (
+  value: number | null | undefined
+) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return
+  }
+
+  updateSelectedPlaylistSettings({
+    defaultDurationSec: value
+  })
+}
+
+const updateSelectedPlaylistWebTimeout = (value: number | null | undefined) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return
+  }
+
+  updateSelectedPlaylistSettings({
+    webTimeoutSec: value
+  })
 }
 
 const displayPlaylist = (displayId: string) =>

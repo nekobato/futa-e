@@ -168,3 +168,67 @@ describe('browser mock displays', () => {
     stop()
   })
 })
+
+describe('browser mock assets', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('opens a browser file picker and returns selected assets', async () => {
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(
+      (file) => `blob:${(file as File).name}`
+    )
+    vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(
+      () => undefined
+    )
+
+    const promise = createBrowserMockApi().assets.pickFiles({ kind: 'image' })
+
+    let picker: HTMLInputElement | null = null
+    await vi.waitFor(() => {
+      picker = document.body.querySelector('input[type="file"]')
+      expect(picker).not.toBeNull()
+    })
+    const fileInput = picker!
+
+    Object.defineProperty(fileInput, 'files', {
+      configurable: true,
+      value: [
+        new File(['image'], 'hero.png', { type: 'image/png' }),
+        new File(['video'], 'intro.mp4', { type: 'video/mp4' })
+      ]
+    })
+    fileInput.dispatchEvent(new Event('change'))
+
+    await expect(promise).resolves.toEqual([
+      {
+        path: 'blob:hero.png',
+        type: 'image',
+        name: 'hero.png'
+      }
+    ])
+  })
+
+  it('returns an empty list when the picker is closed without a selection', async () => {
+    vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(
+      () => undefined
+    )
+
+    const promise = createBrowserMockApi().assets.pickFiles({ kind: 'video' })
+
+    let picker: HTMLInputElement | null = null
+    await vi.waitFor(() => {
+      picker = document.body.querySelector('input[type="file"]')
+      expect(picker).not.toBeNull()
+    })
+    const fileInput = picker!
+
+    Object.defineProperty(fileInput, 'files', {
+      configurable: true,
+      value: []
+    })
+    window.dispatchEvent(new Event('focus'))
+
+    await expect(promise).resolves.toEqual([])
+  })
+})

@@ -32,6 +32,10 @@ describe('player-config helpers', () => {
         id: 'shared',
         name: 'プレイリスト 1',
         perDisplay: true,
+        loop: true,
+        shuffle: false,
+        defaultDurationSec: 10,
+        webTimeoutSec: 8,
         items: [
           {
             id: 'item-1',
@@ -45,6 +49,10 @@ describe('player-config helpers', () => {
         id: 'secondary',
         name: 'プレイリスト 2',
         perDisplay: false,
+        loop: false,
+        shuffle: true,
+        defaultDurationSec: 15,
+        webTimeoutSec: 12,
         items: []
       }
     ]
@@ -60,6 +68,9 @@ describe('player-config helpers', () => {
     expect(
       getPlaylistById(next.displays['1'].playlists, 'secondary').name
     ).toBe('プレイリスト 2')
+    expect(
+      getPlaylistById(next.displays['1'].playlists, 'secondary').shuffle
+    ).toBe(true)
     expect(next.displays['1'].playlists).not.toBe(config.playlists)
   })
 
@@ -70,12 +81,20 @@ describe('player-config helpers', () => {
         id: 'playlist-1',
         name: 'プレイリスト 1',
         perDisplay: false,
+        loop: true,
+        shuffle: false,
+        defaultDurationSec: 10,
+        webTimeoutSec: 8,
         items: []
       },
       {
         id: 'playlist-2',
         name: 'プレイリスト 2',
         perDisplay: true,
+        loop: true,
+        shuffle: false,
+        defaultDurationSec: 10,
+        webTimeoutSec: 8,
         items: []
       }
     ]
@@ -91,12 +110,20 @@ describe('player-config helpers', () => {
         id: 'playlist-1',
         name: 'プレイリスト 1',
         perDisplay: false,
+        loop: true,
+        shuffle: false,
+        defaultDurationSec: 10,
+        webTimeoutSec: 8,
         items: []
       },
       {
         id: 'playlist-2',
         name: 'プレイリスト 2',
         perDisplay: false,
+        loop: false,
+        shuffle: true,
+        defaultDurationSec: 15,
+        webTimeoutSec: 11,
         items: [
           {
             id: 'shared-2',
@@ -115,6 +142,9 @@ describe('player-config helpers', () => {
     expect(
       getPlaylistById(effective.playlists, 'playlist-2').items[0]?.id
     ).toBe('shared-2')
+    expect(getPlaylistById(effective.playlists, 'playlist-2').shuffle).toBe(
+      true
+    )
   })
 
   it('counts enabled per-display windows only when the active playlist is per-display', () => {
@@ -124,12 +154,20 @@ describe('player-config helpers', () => {
         id: 'playlist-1',
         name: 'プレイリスト 1',
         perDisplay: false,
+        loop: true,
+        shuffle: false,
+        defaultDurationSec: 10,
+        webTimeoutSec: 8,
         items: []
       },
       {
         id: 'playlist-2',
         name: 'プレイリスト 2',
         perDisplay: true,
+        loop: true,
+        shuffle: false,
+        defaultDurationSec: 10,
+        webTimeoutSec: 8,
         items: []
       }
     ]

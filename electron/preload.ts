@@ -18,7 +18,6 @@ const api: FutaeApi = {
   assets: {
     pickFiles: (options?: AssetPickOptions) =>
       ipcRenderer.invoke('assets:pick-files', options),
-    pickFolder: () => ipcRenderer.invoke('assets:pick-folder'),
     cacheRemote: (url: string, type: AssetType) =>
       ipcRenderer.invoke('assets:cache-remote', { url, type })
   },

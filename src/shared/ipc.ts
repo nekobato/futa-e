@@ -19,7 +19,6 @@ export type FutaeApi = {
   }
   assets: {
     pickFiles: (options?: AssetPickOptions) => Promise<PickedAsset[]>
-    pickFolder: () => Promise<PickedAsset[]>
     cacheRemote: (url: string, type: AssetType) => Promise<CacheResult | null>
   }
   displays: {

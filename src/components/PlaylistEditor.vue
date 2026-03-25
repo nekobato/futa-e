@@ -2,31 +2,33 @@
   <div class="panel-content">
     <div class="playlist-composer">
       <div class="field">
-        <label>種類</label>
-        <div class="choice-group" aria-label="種類">
-          <Button
-            v-for="option in typeOptions"
-            :key="option.value"
-            :label="option.label"
-            severity="secondary"
-            :text="draftType !== option.value"
-            @click="selectDraftType(option.value)"
-          />
-        </div>
+        <label :id="typeLabelId">種類</label>
+        <SelectButton
+          :modelValue="draftType"
+          :options="typeOptions"
+          optionLabel="label"
+          optionValue="value"
+          :allowEmpty="false"
+          :ariaLabelledby="typeLabelId"
+          size="small"
+          class="choice-group"
+          @update:modelValue="handleDraftTypeChange"
+        />
       </div>
 
       <div v-if="draftType !== 'web'" class="field">
-        <label>入力方法</label>
-        <div class="choice-group" aria-label="入力方法">
-          <Button
-            v-for="option in sourceModeOptions"
-            :key="option.value"
-            :label="option.label"
-            severity="secondary"
-            :text="draftSourceMode !== option.value"
-            @click="draftSourceMode = option.value"
-          />
-        </div>
+        <label :id="sourceModeLabelId">入力方法</label>
+        <SelectButton
+          :modelValue="draftSourceMode"
+          :options="sourceModeOptions"
+          optionLabel="label"
+          optionValue="value"
+          :allowEmpty="false"
+          :ariaLabelledby="sourceModeLabelId"
+          size="small"
+          class="choice-group"
+          @update:modelValue="handleDraftSourceModeChange"
+        />
       </div>
 
       <div v-if="draftSourceMode === 'url'" class="field">
@@ -51,13 +53,6 @@
             icon="pi pi-images"
             severity="secondary"
             @click="pickDraftFiles"
-          />
-          <Button
-            v-if="allowFolderImport && !singleItemMode"
-            label="フォルダを選択"
-            icon="pi pi-folder-open"
-            severity="secondary"
-            @click="pickDraftFolder"
           />
           <Button
             v-if="draftAssets.length > 0"
@@ -295,14 +290,12 @@ const props = withDefaults(
     playlist: PlaylistItem[]
     defaultDurationSec: number
     maxItems?: number
-    allowFolderImport?: boolean
     allowFallback?: boolean
     showDraftDuration?: boolean
     showItemSettings?: boolean
     emptyMessage?: string
   }>(),
   {
-    allowFolderImport: true,
     allowFallback: true,
     showDraftDuration: true,
     showItemSettings: true,
@@ -320,6 +313,8 @@ const api = getFutaeApi()
 const urlInputId = createId()
 const urlDurationInputId = createId()
 const draftFallbackEnabledId = createId()
+const typeLabelId = createId()
+const sourceModeLabelId = createId()
 
 const urlInput = ref('')
 const draftType = ref<AssetType>('image')
@@ -330,16 +325,16 @@ const draftFallback = ref<string | null>(null)
 const draftFallbackEnabled = ref(false)
 const fallbackVisibility = ref<Record<string, boolean>>({})
 
-const typeOptions = [
+const typeOptions: Array<{ label: string; value: AssetType }> = [
   { label: '画像', value: 'image' },
   { label: '動画', value: 'video' },
   { label: 'ウェブ', value: 'web' }
-] as const
+]
 
-const sourceModeOptions = [
+const sourceModeOptions: Array<{ label: string; value: DraftSourceMode }> = [
   { label: 'ファイル', value: 'file' },
   { label: 'URL', value: 'url' }
-] as const
+]
 
 const singleItemMode = computed(() => props.maxItems === 1)
 const fileSelectionTitle = computed(() =>
@@ -351,7 +346,7 @@ const selectedAssetsLabel = computed(() => {
   }
 
   if (draftAssets.value.length === 1) {
-    return titleFromPath(draftAssets.value[0].path)
+    return assetLabel(draftAssets.value[0])
   }
 
   return `${draftAssets.value.length} 件選択中`
@@ -404,7 +399,7 @@ const normalizeDuration = (
 const buildItem = (asset: PickedAsset): PlaylistItem => ({
   id: createId(),
   type: asset.type,
-  title: titleFromPath(asset.path),
+  title: assetLabel(asset),
   src: asset.path,
   durationSec: normalizeDuration(asset.type, urlDuration.value),
   mute: false
@@ -442,23 +437,30 @@ const selectDraftType = (type: AssetType) => {
   draftAssets.value = draftAssets.value.filter((asset) => asset.type === type)
 }
 
+const handleDraftTypeChange = (type: AssetType | null | undefined) => {
+  if (!type) {
+    return
+  }
+
+  selectDraftType(type)
+}
+
+const handleDraftSourceModeChange = (
+  sourceMode: DraftSourceMode | null | undefined
+) => {
+  if (!sourceMode) {
+    return
+  }
+
+  draftSourceMode.value = sourceMode
+}
+
 const pickDraftFiles = async () => {
   if (draftType.value === 'web') {
     return
   }
 
   const assets = await api.assets.pickFiles({ kind: draftType.value })
-  draftAssets.value = singleItemMode.value ? assets.slice(0, 1) : assets
-}
-
-const pickDraftFolder = async () => {
-  if (draftType.value === 'web') {
-    return
-  }
-
-  const assets = (await api.assets.pickFolder()).filter(
-    (asset) => asset.type === draftType.value
-  )
   draftAssets.value = singleItemMode.value ? assets.slice(0, 1) : assets
 }
 
@@ -578,6 +580,9 @@ const clearItemFallback = (index: number, itemId: string) => {
   }
   updateItem(index, { fallbackSrc: undefined })
 }
+
+const assetLabel = (asset: PickedAsset) =>
+  asset.name ?? titleFromPath(asset.path)
 
 const fallbackLabel = (src?: string) => (src ? titleFromPath(src) : '未選択')
 

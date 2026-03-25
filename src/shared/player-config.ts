@@ -37,7 +37,11 @@ export const syncPlaylistsWithSource = (
     return {
       ...currentPlaylist,
       name: sourcePlaylist.name,
-      perDisplay: sourcePlaylist.perDisplay
+      perDisplay: sourcePlaylist.perDisplay,
+      loop: sourcePlaylist.loop,
+      shuffle: sourcePlaylist.shuffle,
+      defaultDurationSec: sourcePlaylist.defaultDurationSec,
+      webTimeoutSec: sourcePlaylist.webTimeoutSec
     }
   })
 }
@@ -151,6 +155,21 @@ export const replacePlaylistNameById = (
   replacePlaylistById(playlists, playlistId, (playlist) => ({
     ...playlist,
     name
+  }))
+
+export const replacePlaylistSettingsById = (
+  playlists: PlaylistConfig[] | undefined,
+  playlistId: string,
+  settings: Partial<
+    Pick<
+      PlaylistConfig,
+      'loop' | 'shuffle' | 'defaultDurationSec' | 'webTimeoutSec'
+    >
+  >
+): PlaylistConfig[] =>
+  replacePlaylistById(playlists, playlistId, (playlist) => ({
+    ...playlist,
+    ...settings
   }))
 
 export const countEnabledDisplays = (

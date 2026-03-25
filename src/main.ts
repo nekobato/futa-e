@@ -6,6 +6,7 @@ import InputNumber from 'primevue/inputnumber'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Checkbox from 'primevue/checkbox'
 import Divider from 'primevue/divider'
+import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
@@ -38,6 +39,7 @@ app.component('InputNumber', InputNumber)
 app.component('ToggleSwitch', ToggleSwitch)
 app.component('Checkbox', Checkbox)
 app.component('Divider', Divider)
+app.component('SelectButton', SelectButton)
 app.component('Tag', Tag)
 app.component('Splitter', Splitter)
 app.component('SplitterPanel', SplitterPanel)

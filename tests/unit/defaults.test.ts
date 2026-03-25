@@ -11,19 +11,23 @@ describe('config coercion', () => {
           id: 'playlist-1',
           name: 'プレイリスト 1',
           perDisplay: false,
+          loop: true,
+          shuffle: false,
+          defaultDurationSec: 10,
+          webTimeoutSec: 8,
           items: []
         },
         {
           id: 'playlist-2',
           name: 'プレイリスト 2',
           perDisplay: true,
+          loop: false,
+          shuffle: true,
+          defaultDurationSec: 20,
+          webTimeoutSec: 12,
           items: []
         }
       ],
-      loop: true,
-      shuffle: false,
-      defaultDurationSec: 10,
-      webTimeoutSec: 8,
       displays: {},
       updatedAt: '2026-03-18T00:00:00.000Z'
     })
@@ -60,7 +64,11 @@ describe('config coercion', () => {
     expect(config.playlists).toHaveLength(2)
     expect(config.playlists[0]).toMatchObject({
       name: 'プレイリスト 1',
-      perDisplay: true
+      perDisplay: true,
+      loop: true,
+      shuffle: false,
+      defaultDurationSec: 10,
+      webTimeoutSec: 8
     })
     expect(config.playlists[0]?.items[0]).toMatchObject({
       id: 'legacy-main',
@@ -68,7 +76,11 @@ describe('config coercion', () => {
     })
     expect(config.playlists[1]).toMatchObject({
       name: 'プレイリスト 2',
-      perDisplay: true
+      perDisplay: true,
+      loop: true,
+      shuffle: false,
+      defaultDurationSec: 10,
+      webTimeoutSec: 8
     })
     expect(config.playlists[1]?.items[0]).toMatchObject({
       type: 'image',

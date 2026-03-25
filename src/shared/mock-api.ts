@@ -2,20 +2,117 @@ import type {
   AssetType,
   CacheResult,
   DisplayInfo,
+  PickedAsset,
   PlayerConfig,
   PlayerStatus
 } from './types'
 import type { AssetPickOptions, FutaeApi } from './ipc'
 import { coerceConfig, createDefaultConfig } from './defaults'
+import { inferAssetTypeFromPath } from './picked-assets'
 import { countEnabledDisplays, ensureDisplayConfigs } from './player-config'
 
 const CONFIG_KEY = 'futae:mock:config'
 const STATUS_KEY = 'futae:mock:status'
 
 const CONFIG_EVENT = 'futae:mock:config'
-
 let cachedScreenDetails: Promise<WindowManagementScreenDetails | null> | null =
   null
+
+const inferAssetTypeFromFile = (file: File): AssetType | null => {
+  if (file.type.startsWith('image/')) {
+    return 'image'
+  }
+
+  if (file.type.startsWith('video/')) {
+    return 'video'
+  }
+
+  return inferAssetTypeFromPath(file.name)
+}
+
+const isAllowedAssetType = (
+  type: AssetType | null,
+  kind: AssetPickOptions['kind']
+): type is 'image' | 'video' => {
+  if (!type) {
+    return false
+  }
+
+  if (!kind || kind === 'media') {
+    return true
+  }
+
+  return type === kind
+}
+
+const toPickedAsset = (
+  file: File,
+  kind: AssetPickOptions['kind']
+): PickedAsset | null => {
+  const type = inferAssetTypeFromFile(file)
+  if (!isAllowedAssetType(type, kind)) {
+    return null
+  }
+
+  return {
+    path: URL.createObjectURL(file),
+    type,
+    name: file.name
+  }
+}
+
+const browserPickFiles = async (
+  options?: AssetPickOptions
+): Promise<PickedAsset[]> =>
+  new Promise((resolve) => {
+    const input = document.createElement('input')
+    const accept =
+      options?.kind === 'image'
+        ? 'image/*'
+        : options?.kind === 'video'
+          ? 'video/*'
+          : 'image/*,video/*'
+    let settled = false
+
+    input.type = 'file'
+    input.multiple = true
+    input.accept = accept
+    input.style.position = 'fixed'
+    input.style.left = '-9999px'
+    input.style.opacity = '0'
+
+    const finish = (picked: PickedAsset[]) => {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      window.removeEventListener('focus', handleFocus)
+      input.removeEventListener('change', handleChange)
+      input.remove()
+      resolve(picked)
+    }
+
+    const handleChange = () => {
+      const picked = Array.from(input.files ?? [])
+        .map((file) => toPickedAsset(file, options?.kind))
+        .filter((asset): asset is PickedAsset => Boolean(asset))
+      finish(picked)
+    }
+
+    const handleFocus = () => {
+      window.setTimeout(() => {
+        if ((input.files?.length ?? 0) === 0) {
+          finish([])
+        }
+      }, 0)
+    }
+
+    input.addEventListener('change', handleChange)
+    window.addEventListener('focus', handleFocus)
+    document.body.appendChild(input)
+    input.click()
+  })
 
 const getDisplayBounds = (screenInfo: WindowManagementDetailedScreen) => ({
   x: screenInfo.left ?? screenInfo.availLeft ?? 0,
@@ -123,7 +220,6 @@ const writeConfig = async (config: PlayerConfig): Promise<PlayerConfig> => {
   return normalized
 }
 
-const noopPick = async (_options?: AssetPickOptions): Promise<never[]> => []
 const noopCache = async (
   _url: string,
   _type: AssetType
@@ -157,8 +253,7 @@ export const createBrowserMockApi = (): FutaeApi => {
       }
     },
     assets: {
-      pickFiles: noopPick,
-      pickFolder: async () => [],
+      pickFiles: browserPickFiles,
       cacheRemote: noopCache
     },
     displays: {

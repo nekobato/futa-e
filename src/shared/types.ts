@@ -15,6 +15,10 @@ export type PlaylistConfig = {
   id: string
   name: string
   perDisplay: boolean
+  loop: boolean
+  shuffle: boolean
+  defaultDurationSec: number
+  webTimeoutSec: number
   items: PlaylistItem[]
 }
 
@@ -22,10 +26,6 @@ export type PlayerConfig = {
   version: 1
   activePlaylistId: string
   playlists: PlaylistConfig[]
-  loop: boolean
-  shuffle: boolean
-  defaultDurationSec: number
-  webTimeoutSec: number
   displays: Record<string, DisplayConfig>
   updatedAt: string
 }
@@ -38,6 +38,7 @@ export type PlayerStatus = {
 export type PickedAsset = {
   path: string
   type: AssetType
+  name?: string
 }
 
 export type CacheResult = {

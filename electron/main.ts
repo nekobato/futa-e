@@ -15,21 +15,14 @@ import {
   getActivePlaylist,
   isPerDisplayPlaylist
 } from '../src/shared/player-config'
+import {
+  dialogExtensionsForKind,
+  toPickedAssetFromPath
+} from '../src/shared/picked-assets'
 import { loadConfig, saveConfig } from './config'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-
-const IMAGE_EXTENSIONS = new Set([
-  '.jpg',
-  '.jpeg',
-  '.png',
-  '.gif',
-  '.webp',
-  '.bmp',
-  '.svg'
-])
-const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.webm', '.mkv', '.avi'])
 
 let controlWindow: BrowserWindow | null = null
 let playerWindows: BrowserWindow[] = []
@@ -37,7 +30,7 @@ let currentConfig: PlayerConfig = createDefaultConfig()
 const heartbeatMap = new Map<number, number>()
 let heartbeatInterval: NodeJS.Timeout | null = null
 
-const getPreloadPath = () => join(__dirname, '../preload/index.js')
+const getPreloadPath = () => join(__dirname, 'preload.js')
 
 const getRendererUrl = (
   view: string,
@@ -50,13 +43,6 @@ const getRendererUrl = (
   return `${base}?${search}`
 }
 
-const inferAssetType = (filePath: string): AssetType | null => {
-  const ext = extname(filePath).toLowerCase()
-  if (IMAGE_EXTENSIONS.has(ext)) return 'image'
-  if (VIDEO_EXTENSIONS.has(ext)) return 'video'
-  return null
-}
-
 const pickFiles = async (
   kind: 'image' | 'video' | 'media' = 'media'
 ): Promise<PickedAsset[]> => {
@@ -64,13 +50,13 @@ const pickFiles = async (
   if (kind === 'image' || kind === 'media') {
     filters.push({
       name: 'Images',
-      extensions: Array.from(IMAGE_EXTENSIONS).map((ext) => ext.slice(1))
+      extensions: dialogExtensionsForKind('image').map((ext) => ext.slice(1))
     })
   }
   if (kind === 'video' || kind === 'media') {
     filters.push({
       name: 'Videos',
-      extensions: Array.from(VIDEO_EXTENSIONS).map((ext) => ext.slice(1))
+      extensions: dialogExtensionsForKind('video').map((ext) => ext.slice(1))
     })
   }
 
@@ -90,34 +76,7 @@ const pickFiles = async (
   }
 
   return result.filePaths
-    .map((path) => {
-      const type = inferAssetType(path)
-      return type ? { path, type } : null
-    })
-    .filter((asset): asset is PickedAsset => Boolean(asset))
-}
-
-const pickFolder = async (): Promise<PickedAsset[]> => {
-  const dialogOptions = {
-    properties: ['openDirectory'] as Electron.OpenDialogOptions['properties']
-  }
-  const result = controlWindow
-    ? await dialog.showOpenDialog(controlWindow, dialogOptions)
-    : await dialog.showOpenDialog(dialogOptions)
-
-  if (result.canceled || result.filePaths.length === 0) {
-    return []
-  }
-
-  const folderPath = result.filePaths[0]
-  const entries = await fs.readdir(folderPath, { withFileTypes: true })
-  return entries
-    .filter((entry) => entry.isFile())
-    .map((entry) => join(folderPath, entry.name))
-    .map((path) => {
-      const type = inferAssetType(path)
-      return type ? { path, type } : null
-    })
+    .map((path) => toPickedAssetFromPath(path, kind))
     .filter((asset): asset is PickedAsset => Boolean(asset))
 }
 
@@ -265,10 +224,17 @@ const createPlayerWindows = () => {
         y: display.bounds.y,
         width: display.bounds.width,
         height: display.bounds.height,
-        fullscreen: true,
+        show: false,
         frame: false,
+        kiosk: true,
+        fullscreenable: false,
+        autoHideMenuBar: true,
+        resizable: false,
+        movable: false,
+        minimizable: false,
+        maximizable: false,
         backgroundColor: '#000000',
-        show: true
+        alwaysOnTop: true
       },
       {
         displayId: String(display.id)
@@ -289,6 +255,19 @@ const createPlayerWindows = () => {
 
     win.webContents.once('did-finish-load', () => {
       win.webContents.send('config:updated', currentConfig)
+    })
+
+    win.once('ready-to-show', () => {
+      win.setAlwaysOnTop(true)
+      win.setFullScreenable(false)
+      win.setFullScreen(true)
+      win.setKiosk(true)
+      if (process.platform !== 'win32') {
+        win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+      }
+      win.show()
+      win.focus()
+      win.moveTop()
     })
 
     win.webContents.on('unresponsive', () => {
@@ -371,8 +350,6 @@ ipcMain.handle(
     pickFiles(options?.kind ?? 'media')
 )
 
-ipcMain.handle('assets:pick-folder', async () => pickFolder())
-
 ipcMain.handle(
   'assets:cache-remote',
   async (_event, payload: { url: string; type: AssetType }) =>
@@ -383,6 +360,7 @@ ipcMain.handle('displays:list', async () => listDisplays())
 
 ipcMain.handle('player:start', async () => {
   if (playerWindows.length === 0) {
+    console.log('Starting player windows...')
     createPlayerWindows()
     broadcastConfig(currentConfig)
   }

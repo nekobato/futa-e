@@ -103,6 +103,12 @@ const effectiveDisplay = computed(() =>
   getEffectiveDisplayConfig(config.value, displayId)
 )
 const activePlaylistConfig = computed(() => getActivePlaylist(config.value))
+const effectiveActivePlaylistConfig = computed(() =>
+  getActivePlaylist({
+    activePlaylistId: config.value.activePlaylistId,
+    playlists: effectiveDisplay.value.playlists
+  })
+)
 const missingDisplayTarget = computed(
   () =>
     activePlaylistConfig.value.perDisplay &&
@@ -112,13 +118,7 @@ const missingDisplayTarget = computed(
 const displayEnabled = computed(
   () => !missingDisplayTarget.value && effectiveDisplay.value.enabled
 )
-const activePlaylist = computed(
-  () =>
-    getActivePlaylist({
-      activePlaylistId: config.value.activePlaylistId,
-      playlists: effectiveDisplay.value.playlists
-    }).items
-)
+const activePlaylist = computed(() => effectiveActivePlaylistConfig.value.items)
 const currentItem = computed(
   () => activePlaylist.value[currentIndex.value] ?? null
 )
@@ -133,6 +133,8 @@ const resolveSource = (src: string): string => {
   }
   if (
     src.startsWith('http') ||
+    src.startsWith('blob:') ||
+    src.startsWith('data:') ||
     src.startsWith('file://') ||
     src.startsWith('/')
   ) {
@@ -185,7 +187,7 @@ const startWebTimeout = () => {
     if (webState.value !== 'ready') {
       webState.value = 'failed'
     }
-  }, config.value.webTimeoutSec * 1000)
+  }, effectiveActivePlaylistConfig.value.webTimeoutSec * 1000)
 }
 
 const startPlaybackForItem = (item: PlaylistItem | null) => {
@@ -222,7 +224,10 @@ const startPlaybackForItem = (item: PlaylistItem | null) => {
     startWebTimeout()
   }
 
-  scheduleNext((item.durationSec ?? config.value.defaultDurationSec) * 1000)
+  scheduleNext(
+    (item.durationSec ??
+      effectiveActivePlaylistConfig.value.defaultDurationSec) * 1000
+  )
 }
 
 const selectPointer = (pointer: number | null) => {
@@ -260,7 +265,7 @@ const resetPlayback = () => {
 
   playbackOrder.value = createPlaybackOrder(
     activePlaylist.value.length,
-    config.value.shuffle
+    effectiveActivePlaylistConfig.value.shuffle
   )
   selectPointer(firstPlayablePointer(playbackOrder.value, failedIndices))
 }
@@ -286,7 +291,7 @@ const moveToNextItem = (preserveFailures = false) => {
     return
   }
 
-  if (!config.value.loop) {
+  if (!effectiveActivePlaylistConfig.value.loop) {
     enterSafeMode(
       preserveFailures ? '再生可能な項目がありません。' : '再生が完了しました。'
     )
@@ -295,7 +300,7 @@ const moveToNextItem = (preserveFailures = false) => {
 
   playbackOrder.value = createPlaybackOrder(
     activePlaylist.value.length,
-    config.value.shuffle
+    effectiveActivePlaylistConfig.value.shuffle
   )
   selectPointer(firstPlayablePointer(playbackOrder.value, failedIndices))
 }

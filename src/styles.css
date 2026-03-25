@@ -340,6 +340,11 @@ body {
   gap: 10px;
 }
 
+.choice-group:where(.p-selectbutton) {
+  gap: 0;
+  align-self: flex-start;
+}
+
 .field-inline-toggle {
   align-items: flex-start;
 }
