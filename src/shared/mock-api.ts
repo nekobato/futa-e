@@ -231,6 +231,7 @@ export const createBrowserMockApi = (): FutaeApi => {
   return {
     config: {
       get: async () => readConfig(),
+      getPlayback: async () => readConfig(),
       save: async (next) => writeConfig(next),
       onUpdated: (handler) => {
         const onConfig = (event: Event) => {

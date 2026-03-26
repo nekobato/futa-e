@@ -2,7 +2,7 @@
 
 ## 位置づけ
 
-この文書は、Futa-e Player のローカル限定版に関する暫定仕様です。
+この文書は、Futa-e のローカル限定版に関する暫定仕様です。
 当面は単一 PC 上で完結する運用を対象にし、Cloud、Device Protocol、厳密な Manifest schema は対象外とします。
 
 ## 目的

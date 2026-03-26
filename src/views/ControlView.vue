@@ -3,13 +3,13 @@
     <header class="control-hero">
       <div class="hero-copy">
         <p class="section-kicker">ローカル設定</p>
-        <h1>Futa-e Player</h1>
+        <h1>Futa-e</h1>
         <p>ローカル環境専用のディスプレイ再生コントローラーです。</p>
       </div>
 
       <div class="hero-toolbar">
         <div class="status-cluster">
-          <Tag v-if="dirty" value="未保存" severity="warning" />
+          <Tag value="自動保存" severity="secondary" />
           <Tag :value="statusLabel" severity="info" />
           <span class="surface-note"
             >接続ディスプレイ {{ displayInfos.length }} 台</span
@@ -23,12 +23,6 @@
             icon="pi pi-refresh"
             severity="secondary"
             @click="loadConfig"
-          />
-          <Button
-            label="保存"
-            icon="pi pi-save"
-            :disabled="!dirty"
-            @click="saveConfig"
           />
           <Button
             label="開始"
@@ -372,7 +366,6 @@
                               selectedPlaylist.defaultDurationSec
                             "
                             @update:playlist="updateSelectedSharedPlaylist"
-                            @changed="markDirty"
                           />
                         </div>
                       </TabPanel>
@@ -435,7 +428,6 @@
                                   playlist
                                 )
                             "
-                            @changed="markDirty"
                           />
                         </div>
                       </TabPanel>
@@ -448,7 +440,6 @@
                     :playlist="selectedPlaylist.items"
                     :default-duration-sec="selectedPlaylist.defaultDurationSec"
                     @update:playlist="updateSelectedSharedPlaylist"
-                    @changed="markDirty"
                   />
                 </div>
               </div>
@@ -464,6 +455,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import PlaylistEditor from '../components/PlaylistEditor.vue'
 import { getFutaeApi } from '../shared/api'
+import { createAutoSaveController } from '../shared/config-autosave'
 import {
   createDefaultConfig,
   createDefaultPlaylistConfig
@@ -502,7 +494,6 @@ const status = ref<PlayerStatus>({
   running: false,
   displayCount: 0
 })
-const dirty = ref(false)
 const selectedPlaylistId = ref('')
 const selectedPlaylistScope = ref('shared')
 
@@ -520,10 +511,6 @@ const selectedPlaylistIndex = computed(() =>
     (playlist) => playlist.id === selectedPlaylist.value.id
   )
 )
-
-const markDirty = () => {
-  dirty.value = true
-}
 
 const displayEnabledInputId = (displayId: string) =>
   `display-enabled-${displayId}`
@@ -598,26 +585,33 @@ const refreshDisplays = async () => {
   syncDisplays(await api.displays.list())
 }
 
-const loadConfig = async () => {
-  config.value = await api.config.get()
-  await refreshDisplays()
-  dirty.value = false
-  status.value = await api.player.status()
-  syncSelection()
-}
-
-const saveConfig = async () => {
+const persistConfig = async (next: PlayerConfig) => {
   const prepared = ensureDisplayConfigs(
     {
-      ...config.value,
+      ...next,
       updatedAt: new Date().toISOString()
     },
     displayInfos.value
   )
 
-  config.value = await api.config.save(prepared)
-  dirty.value = false
+  return api.config.save(prepared)
+}
+
+const autoSave = createAutoSaveController({
+  onError: (error) => {
+    console.error('Failed to auto-save config.', error)
+  },
+  persist: persistConfig,
+  source: config
+})
+
+const loadConfig = async () => {
+  autoSave.pause()
+  config.value = await api.config.get()
+  await refreshDisplays()
+  status.value = await api.player.status()
   syncSelection()
+  autoSave.resume(config.value)
 }
 
 const selectPlaylist = (playlistId: string) => {
@@ -634,7 +628,6 @@ const setActivePlaylist = (playlistId: string) => {
     displayInfos.value
   )
   syncSelection()
-  markDirty()
 }
 
 const setDisplayEnabled = (displayId: string, enabled: boolean) => {
@@ -653,7 +646,6 @@ const setDisplayEnabled = (displayId: string, enabled: boolean) => {
     },
     displayInfos.value
   )
-  markDirty()
 }
 
 const updateSelectedPlaylistScope = (
@@ -696,7 +688,6 @@ const updateSelectedSharedPlaylist = (playlist: PlaylistItem[]) => {
     },
     displayInfos.value
   )
-  markDirty()
 }
 
 const updateSelectedDisplayPlaylist = (
@@ -722,7 +713,6 @@ const updateSelectedDisplayPlaylist = (
     },
     displayInfos.value
   )
-  markDirty()
 }
 
 const renameSelectedPlaylist = (name: string) => {
@@ -737,7 +727,6 @@ const renameSelectedPlaylist = (name: string) => {
     },
     displayInfos.value
   )
-  markDirty()
 }
 
 const toggleSelectedPlaylistPerDisplay = (enabled: boolean) => {
@@ -772,7 +761,6 @@ const toggleSelectedPlaylistPerDisplay = (enabled: boolean) => {
     displayInfos.value
   )
   selectedPlaylistScope.value = 'shared'
-  markDirty()
 }
 
 const updateSelectedPlaylistSettings = (
@@ -794,7 +782,6 @@ const updateSelectedPlaylistSettings = (
     },
     displayInfos.value
   )
-  markDirty()
 }
 
 const updateSelectedPlaylistDefaultDuration = (
@@ -838,7 +825,6 @@ const addPlaylist = () => {
   )
   selectedPlaylistId.value = playlist.id
   selectedPlaylistScope.value = 'shared'
-  markDirty()
 }
 
 const duplicateSelectedPlaylist = () => {
@@ -890,7 +876,6 @@ const duplicateSelectedPlaylist = () => {
   )
   selectedPlaylistId.value = duplicateId
   selectedPlaylistScope.value = 'shared'
-  markDirty()
 }
 
 const removeSelectedPlaylist = () => {
@@ -932,7 +917,6 @@ const removeSelectedPlaylist = () => {
   )
   selectedPlaylistId.value = fallbackPlaylist.id
   selectedPlaylistScope.value = 'shared'
-  markDirty()
 }
 
 const moveSelectedPlaylist = (offset: -1 | 1) => {
@@ -955,13 +939,10 @@ const moveSelectedPlaylist = (offset: -1 | 1) => {
     displayInfos.value
   )
   selectedPlaylistId.value = moved.id
-  markDirty()
 }
 
 const startPlayer = async () => {
-  if (dirty.value) {
-    await saveConfig()
-  }
+  await autoSave.flush()
   status.value = await api.player.start()
 }
 
@@ -978,5 +959,13 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   removeDisplayListener?.()
+  void autoSave
+    .flush()
+    .catch((error) => {
+      console.error('Failed to flush config before closing.', error)
+    })
+    .finally(() => {
+      autoSave.stop()
+    })
 })
 </script>

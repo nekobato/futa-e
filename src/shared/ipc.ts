@@ -14,6 +14,7 @@ export type AssetPickOptions = {
 export type FutaeApi = {
   config: {
     get: () => Promise<PlayerConfig>
+    getPlayback: () => Promise<PlayerConfig>
     save: (next: PlayerConfig) => Promise<PlayerConfig>
     onUpdated: (handler: (config: PlayerConfig) => void) => () => void
   }

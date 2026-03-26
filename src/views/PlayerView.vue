@@ -346,7 +346,7 @@ const startHeartbeat = () => {
 
 onMounted(async () => {
   syncDisplays(await api.displays.list())
-  applyConfig(await api.config.get())
+  applyConfig(await api.config.getPlayback())
   removeConfigListener = api.config.onUpdated((next) => {
     applyConfig(next)
   })

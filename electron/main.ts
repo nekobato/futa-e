@@ -19,14 +19,16 @@ import {
   dialogExtensionsForKind,
   toPickedAssetFromPath
 } from '../src/shared/picked-assets'
-import { loadConfig, saveConfig } from './config'
+import { loadConfig, loadPlaybackConfig, saveConfig } from './config'
+import { shouldExitPlayerWindows } from './player-window-input'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 let controlWindow: BrowserWindow | null = null
 let playerWindows: BrowserWindow[] = []
-let currentConfig: PlayerConfig = createDefaultConfig()
+let editableConfig: PlayerConfig = createDefaultConfig()
+let playbackConfig: PlayerConfig = createDefaultConfig()
 const heartbeatMap = new Map<number, number>()
 let heartbeatInterval: NodeJS.Timeout | null = null
 
@@ -197,7 +199,7 @@ const createControlWindow = () => {
     height: 800,
     minWidth: 980,
     minHeight: 720,
-    title: 'Futa-e Player'
+    title: 'Futa-e'
   })
 
   controlWindow.on('closed', () => {
@@ -206,13 +208,13 @@ const createControlWindow = () => {
 }
 
 const createPlayerWindows = () => {
-  const activePlaylist = getActivePlaylist(currentConfig)
+  const activePlaylist = getActivePlaylist(playbackConfig)
   const displays = isPerDisplayPlaylist(activePlaylist)
     ? screen
         .getAllDisplays()
         .filter(
           (display) =>
-            currentConfig.displays[String(display.id)]?.enabled !== false
+            playbackConfig.displays[String(display.id)]?.enabled !== false
         )
     : screen.getAllDisplays()
 
@@ -254,7 +256,16 @@ const createPlayerWindows = () => {
     })
 
     win.webContents.once('did-finish-load', () => {
-      win.webContents.send('config:updated', currentConfig)
+      win.webContents.send('config:updated', playbackConfig)
+    })
+
+    win.webContents.on('before-input-event', (event, input) => {
+      if (!shouldExitPlayerWindows(input)) {
+        return
+      }
+
+      event.preventDefault()
+      exitPlayerMode()
     })
 
     win.once('ready-to-show', () => {
@@ -292,6 +303,26 @@ const closePlayerWindows = () => {
   stopHeartbeatMonitor()
 }
 
+const restoreControlWindow = () => {
+  if (!controlWindow || controlWindow.isDestroyed()) {
+    createControlWindow()
+    return
+  }
+
+  if (controlWindow.isMinimized()) {
+    controlWindow.restore()
+  }
+
+  controlWindow.show()
+  controlWindow.focus()
+  controlWindow.moveTop()
+}
+
+const exitPlayerMode = () => {
+  closePlayerWindows()
+  restoreControlWindow()
+}
+
 const getStatus = (): PlayerStatus => ({
   running: playerWindows.length > 0,
   displayCount: playerWindows.length
@@ -299,19 +330,21 @@ const getStatus = (): PlayerStatus => ({
 
 const updateConfig = async (next: PlayerConfig): Promise<PlayerConfig> => {
   const normalized = coerceConfig(next)
-  currentConfig = await saveConfig(normalized)
+  editableConfig = await saveConfig(normalized)
+  playbackConfig = await loadPlaybackConfig()
 
   if (playerWindows.length > 0) {
     closePlayerWindows()
     createPlayerWindows()
   }
 
-  broadcastConfig(currentConfig)
-  return currentConfig
+  broadcastConfig(playbackConfig)
+  return editableConfig
 }
 
 app.whenReady().then(async () => {
-  currentConfig = await loadConfig()
+  editableConfig = await loadConfig()
+  playbackConfig = await loadPlaybackConfig()
 
   createControlWindow()
 
@@ -338,7 +371,9 @@ app.on('will-quit', () => {
   screen.removeListener('display-metrics-changed', broadcastDisplays)
 })
 
-ipcMain.handle('config:get', () => currentConfig)
+ipcMain.handle('config:get', () => editableConfig)
+
+ipcMain.handle('config:get-playback', () => playbackConfig)
 
 ipcMain.handle('config:save', async (_event, next: PlayerConfig) =>
   updateConfig(next)
@@ -362,13 +397,13 @@ ipcMain.handle('player:start', async () => {
   if (playerWindows.length === 0) {
     console.log('Starting player windows...')
     createPlayerWindows()
-    broadcastConfig(currentConfig)
+    broadcastConfig(playbackConfig)
   }
   return getStatus()
 })
 
 ipcMain.handle('player:stop', async () => {
-  closePlayerWindows()
+  exitPlayerMode()
   return getStatus()
 })
 
