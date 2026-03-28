@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultConfig } from '../../src/shared/defaults'
 import {
-  coerceStoredConfigDocument,
-  resolvePlaybackConfig,
-  updateLocalConfigDocument
+  cloneStoredConfig,
+  coerceStoredConfig,
+  createDefaultStoredConfig
 } from '../../src/shared/config-store'
 
 describe('config store document', () => {
-  it('migrates a legacy player config into local mode storage', () => {
-    const document = coerceStoredConfigDocument({
+  it('migrates a legacy player config into the current storage shape', () => {
+    const config = coerceStoredConfig({
       version: 1,
       activePlaylistId: 'playlist-2',
       playlists: [
@@ -37,18 +37,15 @@ describe('config store document', () => {
       updatedAt: '2026-03-18T00:00:00.000Z'
     })
 
-    expect(document.mode).toBe('local')
-    expect(document.localConfig.activePlaylistId).toBe('playlist-2')
-    expect(document.cloud.cachedConfig.activePlaylistId).toBe('playlist-2')
+    expect(config.activePlaylistId).toBe('playlist-2')
   })
 
-  it('resolves playback config from the cloud cache when cloud mode is active', () => {
+  it('migrates the previous wrapped document to the local config only', () => {
     const localConfig = createDefaultConfig()
     const cloudConfig = createDefaultConfig()
     cloudConfig.playlists[0]!.name = 'Cloud Playlist'
 
-    const document = coerceStoredConfigDocument({
-      mode: 'cloud',
+    const config = coerceStoredConfig({
       localConfig,
       cloud: {
         cachedConfig: cloudConfig,
@@ -59,36 +56,28 @@ describe('config store document', () => {
       updatedAt: '2026-03-26T00:00:00.000Z'
     })
 
-    expect(resolvePlaybackConfig(document).playlists[0]?.name).toBe(
-      'Cloud Playlist'
-    )
+    expect(config).toEqual(localConfig)
+    expect(config).not.toHaveProperty('cloud')
   })
 
-  it('updates only the local editable config when saving from the local editor', () => {
-    const localConfig = createDefaultConfig()
-    const cloudConfig = createDefaultConfig()
-    cloudConfig.playlists[0]!.name = 'Cloud Playlist'
-
-    const document = coerceStoredConfigDocument({
-      mode: 'cloud',
-      localConfig,
-      cloud: {
-        cachedConfig: cloudConfig,
-        etag: 'etag-1',
-        lastFetchedAt: '2026-03-26T00:00:00.000Z',
-        manifestUrl: 'https://example.com/manifest.json'
-      },
-      updatedAt: '2026-03-26T00:00:00.000Z'
-    })
-
+  it('clones editable config before persisting it', () => {
     const nextLocalConfig = createDefaultConfig()
     nextLocalConfig.playlists[0]!.name = 'Local Draft'
 
-    const nextDocument = updateLocalConfigDocument(document, nextLocalConfig)
+    const stored = cloneStoredConfig(nextLocalConfig)
 
-    expect(nextDocument.localConfig.playlists[0]?.name).toBe('Local Draft')
-    expect(nextDocument.cloud.cachedConfig.playlists[0]?.name).toBe(
-      'Cloud Playlist'
-    )
+    expect(stored).toEqual(nextLocalConfig)
+    expect(stored).not.toBe(nextLocalConfig)
+  })
+
+  it('provides a plain player config as the default persisted value', () => {
+    const stored = createDefaultStoredConfig()
+
+    expect(stored).toMatchObject({
+      version: 1,
+      displays: {}
+    })
+    expect(stored).toHaveProperty('playlists')
+    expect(stored).not.toHaveProperty('cloud')
   })
 })

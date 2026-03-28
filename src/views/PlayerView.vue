@@ -7,7 +7,7 @@
       <img
         v-if="currentItem?.type === 'image'"
         :src="currentSource"
-        :alt="currentItem?.title"
+        :alt="currentItemAlt"
         @error="onMediaError"
       />
       <video
@@ -77,6 +77,7 @@ import {
   nextPlayablePointer
 } from '../shared/playback'
 import type { DisplayInfo, PlayerConfig, PlaylistItem } from '../shared/types'
+import { titleFromPath } from '../shared/utils'
 
 const api = getFutaeApi()
 const displayId = new URLSearchParams(window.location.search).get('displayId')
@@ -121,6 +122,11 @@ const displayEnabled = computed(
 const activePlaylist = computed(() => effectiveActivePlaylistConfig.value.items)
 const currentItem = computed(
   () => activePlaylist.value[currentIndex.value] ?? null
+)
+const currentItemAlt = computed(() =>
+  currentItem.value
+    ? titleFromPath(currentItem.value.originUrl ?? currentItem.value.src)
+    : 'プレイリスト項目'
 )
 const safeMode = computed(() => Boolean(safeModeMessage.value))
 const showWebFallback = computed(

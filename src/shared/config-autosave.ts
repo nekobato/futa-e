@@ -8,6 +8,7 @@ export type AutoSaveController<T> = {
   pause: () => void
   resume: (value?: T) => void
   stop: () => void
+  touch: () => void
 }
 
 type CreateAutoSaveControllerOptions<T> = {
@@ -56,6 +57,23 @@ export const createAutoSaveController = <T>({
         onError?.(error)
       })
     }, delayMs)
+  }
+
+  const touch = () => {
+    if (paused) {
+      return
+    }
+
+    if (snapshot(source.value) === lastPersisted) {
+      return
+    }
+
+    if (activeSave) {
+      rerunAfterSave = true
+      return
+    }
+
+    schedulePersist()
   }
 
   const persistLatest = async (): Promise<void> => {
@@ -111,22 +129,12 @@ export const createAutoSaveController = <T>({
     }
   }
 
-  const stopWatching = watch(source, () => {
-    if (paused) {
-      return
+  const stopWatching = watch(
+    () => snapshot(source.value),
+    () => {
+      touch()
     }
-
-    if (snapshot(source.value) === lastPersisted) {
-      return
-    }
-
-    if (activeSave) {
-      rerunAfterSave = true
-      return
-    }
-
-    schedulePersist()
-  })
+  )
 
   return {
     flush: async () => {
@@ -154,6 +162,7 @@ export const createAutoSaveController = <T>({
       paused = true
       clearScheduledSave()
       stopWatching()
-    }
+    },
+    touch
   }
 }

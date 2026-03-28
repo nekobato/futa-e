@@ -4,6 +4,7 @@ import { createAutoSaveController } from '../../src/shared/config-autosave'
 
 type FakeConfig = {
   name: string
+  playlist?: Array<{ src: string }>
   updatedAt: string
 }
 
@@ -119,6 +120,39 @@ describe('config auto save controller', () => {
     expect(source.value).toEqual({
       name: 'second',
       updatedAt: 'saved-2'
+    })
+  })
+
+  it('persists nested changes even when the ref identity does not change', async () => {
+    const source = ref<FakeConfig>({
+      name: 'before',
+      playlist: [{ src: 'before.png' }],
+      updatedAt: 'initial'
+    })
+    const persist = vi.fn(async (value: FakeConfig) => ({
+      ...value,
+      playlist: value.playlist?.map((item) => ({ ...item })),
+      updatedAt: 'saved'
+    }))
+
+    const controller = createAutoSaveController({
+      delayMs: 150,
+      persist,
+      source
+    })
+    controller.resume()
+
+    source.value.playlist?.push({ src: 'after.png' })
+
+    await flushMicrotasks()
+    await vi.advanceTimersByTimeAsync(150)
+    await flushMicrotasks()
+
+    expect(persist).toHaveBeenCalledTimes(1)
+    expect(persist).toHaveBeenCalledWith({
+      name: 'before',
+      playlist: [{ src: 'before.png' }, { src: 'after.png' }],
+      updatedAt: 'initial'
     })
   })
 })

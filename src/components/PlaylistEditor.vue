@@ -147,7 +147,7 @@
         class="playlist-item"
       >
         <div class="playlist-item-header">
-          <strong>{{ item.title }}</strong>
+          <strong>{{ itemLabel(item) }}</strong>
           <Tag :value="itemTypeLabel(item.type)" />
         </div>
 
@@ -156,16 +156,6 @@
         </div>
 
         <div v-if="showItemSettings" class="playlist-fields">
-          <div class="field">
-            <label :for="`playlist-title-${item.id}`">タイトル</label>
-            <InputText
-              :id="`playlist-title-${item.id}`"
-              :modelValue="item.title"
-              class="w-full"
-              @update:modelValue="updateItem(index, { title: String($event) })"
-            />
-          </div>
-
           <div class="field-grid field-grid-2">
             <div class="field">
               <label :for="`playlist-duration-${item.id}`"
@@ -399,7 +389,6 @@ const normalizeDuration = (
 const buildItem = (asset: PickedAsset): PlaylistItem => ({
   id: createId(),
   type: asset.type,
-  title: assetLabel(asset),
   src: asset.path,
   durationSec: normalizeDuration(asset.type, urlDuration.value),
   mute: false
@@ -518,7 +507,6 @@ const addDraft = async () => {
       {
         id: createId(),
         type: draftType.value,
-        title: trimmed,
         src,
         originUrl,
         durationSec: normalizeDuration(draftType.value, urlDuration.value),
@@ -583,6 +571,9 @@ const clearItemFallback = (index: number, itemId: string) => {
 
 const assetLabel = (asset: PickedAsset) =>
   asset.name ?? titleFromPath(asset.path)
+
+const itemLabel = (item: PlaylistItem) =>
+  titleFromPath(item.originUrl ?? item.src)
 
 const fallbackLabel = (src?: string) => (src ? titleFromPath(src) : '未選択')
 

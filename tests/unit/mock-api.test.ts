@@ -169,6 +169,22 @@ describe('browser mock displays', () => {
   })
 })
 
+describe('browser mock config', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('reports that persistence is handled by the browser mock backend', async () => {
+    await expect(
+      createBrowserMockApi().config.getDiagnostics()
+    ).resolves.toEqual({
+      backend: 'browser-mock',
+      configExists: false,
+      configPath: null
+    })
+  })
+})
+
 describe('browser mock assets', () => {
   beforeEach(() => {
     window.localStorage.clear()

@@ -26,13 +26,11 @@ test('skips broken media items and advances to the next playable item', async ({
           {
             id: 'bad',
             type: 'image',
-            title: 'Bad',
             src: '/missing-image.png'
           },
           {
             id: 'good',
             type: 'image',
-            title: 'Good',
             src: '/safe-mode.svg'
           }
         ]
@@ -44,7 +42,7 @@ test('skips broken media items and advances to the next playable item', async ({
 
   await page.goto('/?view=player')
 
-  await expect(page.getByAltText('Good')).toBeVisible()
+  await expect(page.getByAltText('safe-mode.svg')).toBeVisible()
 })
 
 test('uses display-specific playlists when the primary playlist is per-display', async ({
@@ -93,7 +91,6 @@ test('uses display-specific playlists when the primary playlist is per-display',
           {
             id: 'shared-1',
             type: 'image',
-            title: 'Shared',
             src: '/missing-image.png'
           }
         ]
@@ -110,7 +107,6 @@ test('uses display-specific playlists when the primary playlist is per-display',
           {
             id: 'ignored-secondary',
             type: 'image',
-            title: 'Ignored',
             src: '/missing-image-2.png'
           }
         ]
@@ -132,7 +128,6 @@ test('uses display-specific playlists when the primary playlist is per-display',
               {
                 id: 'display-1',
                 type: 'image',
-                title: 'Display 1',
                 src: '/safe-mode.svg'
               }
             ]
@@ -154,7 +149,6 @@ test('uses display-specific playlists when the primary playlist is per-display',
               {
                 id: 'display-2',
                 type: 'image',
-                title: 'Display 2',
                 src: '/safe-mode.svg'
               }
             ]
@@ -171,7 +165,6 @@ test('uses display-specific playlists when the primary playlist is per-display',
               {
                 id: 'ignored-display-2-secondary',
                 type: 'image',
-                title: 'Ignored Secondary',
                 src: '/missing-image.png'
               }
             ]
@@ -184,7 +177,7 @@ test('uses display-specific playlists when the primary playlist is per-display',
 
   await page.goto('/?view=player&displayId=display-2-1920-0-1920x1080')
 
-  await expect(page.getByAltText('Display 2')).toBeVisible()
+  await expect(page.getByAltText('safe-mode.svg')).toBeVisible()
 })
 
 test('does not play when a per-display playlist cannot resolve the target display', async ({
@@ -225,7 +218,6 @@ test('does not play when a per-display playlist cannot resolve the target displa
           {
             id: 'shared-1',
             type: 'image',
-            title: 'Shared',
             src: '/safe-mode.svg'
           }
         ]

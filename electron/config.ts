@@ -1,44 +1,41 @@
-import { app } from 'electron'
 import Store from 'electron-store'
-import { join } from 'node:path'
+import { existsSync } from 'node:fs'
 import {
-  coerceStoredConfigDocument,
-  createDefaultStoredConfigDocument,
-  resolvePlaybackConfig,
-  updateLocalConfigDocument,
-  type StoredConfigDocument
+  cloneStoredConfig,
+  coerceStoredConfig,
+  createDefaultStoredConfig,
+  type StoredConfig
 } from '../src/shared/config-store'
+import type { ConfigDiagnostics } from '../src/shared/ipc'
 import type { PlayerConfig } from '../src/shared/types'
 
 export type ConfigRepository = {
+  getDiagnostics: () => Promise<ConfigDiagnostics>
   getConfigPath: () => string
-  loadEditableConfig: () => Promise<PlayerConfig>
+  loadConfig: () => Promise<PlayerConfig>
   loadPlaybackConfig: () => Promise<PlayerConfig>
-  readDocument: () => Promise<StoredConfigDocument>
-  saveEditableConfig: (config: PlayerConfig) => Promise<PlayerConfig>
-  writeDocument: (
-    document: StoredConfigDocument
-  ) => Promise<StoredConfigDocument>
+  saveConfig: (config: PlayerConfig) => Promise<PlayerConfig>
 }
 
-const getConfigPath = (): string =>
-  join(app.getPath('userData'), 'futae-config.json')
-
-const createDocumentStore = () =>
-  new Store<StoredConfigDocument>({
-    cwd: app.getPath('userData'),
-    defaults: createDefaultStoredConfigDocument(),
+/** Returns the application's persisted configuration store. */
+const createConfigStore = (): Store<StoredConfig> =>
+  new Store<StoredConfig>({
+    defaults: createDefaultStoredConfig(),
     name: 'futae-config'
   })
 
-const createDocumentReader = (
-  store: Store<StoredConfigDocument>
-): (() => StoredConfigDocument) => {
+/** Normalizes raw store contents into the current config shape. */
+const createConfigReader = (
+  store: Store<StoredConfig>
+): (() => StoredConfig) => {
   return () => {
     const raw = store.store
-    const normalized = coerceStoredConfigDocument(raw)
+    const normalized = coerceStoredConfig(raw)
 
-    if (JSON.stringify(raw) !== JSON.stringify(normalized)) {
+    if (
+      !existsSync(store.path) ||
+      JSON.stringify(raw) !== JSON.stringify(normalized)
+    ) {
       store.store = normalized
     }
 
@@ -46,52 +43,48 @@ const createDocumentReader = (
   }
 }
 
+/** Creates the repository that bridges Electron Store and the app config model. */
 export const createConfigRepository = (): ConfigRepository => {
-  const store = createDocumentStore()
-  const readFromStore = createDocumentReader(store)
+  const store = createConfigStore()
+  const readFromStore = createConfigReader(store)
 
-  const readDocument = async (): Promise<StoredConfigDocument> =>
-    readFromStore()
-
-  const writeDocument = async (
-    document: StoredConfigDocument
-  ): Promise<StoredConfigDocument> => {
-    const normalized = coerceStoredConfigDocument(document)
-    store.store = normalized
-    return normalized
-  }
+  const getConfigPath = (): string => store.path
 
   return {
+    getDiagnostics: async () => ({
+      backend: 'electron-store',
+      configExists: existsSync(store.path),
+      configPath: store.path
+    }),
     getConfigPath,
-    loadEditableConfig: async () => readFromStore().localConfig,
-    loadPlaybackConfig: async () => resolvePlaybackConfig(readFromStore()),
-    readDocument,
-    saveEditableConfig: async (config) => {
-      const current = readFromStore()
-      const next = updateLocalConfigDocument(current, config)
-      const saved = await writeDocument(next)
-      return saved.localConfig
-    },
-    writeDocument
+    loadConfig: async () => readFromStore(),
+    loadPlaybackConfig: async () => readFromStore(),
+    saveConfig: async (config) => {
+      const next = cloneStoredConfig(config)
+      store.store = next
+      return next
+    }
   }
 }
 
-const configRepository = createConfigRepository()
+let configRepository: ConfigRepository | null = null
+
+/** Returns a lazily-initialized configuration repository. */
+const getConfigRepository = (): ConfigRepository => {
+  configRepository ??= createConfigRepository()
+  return configRepository
+}
 
 export const loadConfig = async (): Promise<PlayerConfig> =>
-  configRepository.loadEditableConfig()
+  getConfigRepository().loadConfig()
 
 export const loadPlaybackConfig = async (): Promise<PlayerConfig> =>
-  configRepository.loadPlaybackConfig()
+  getConfigRepository().loadPlaybackConfig()
 
 export const saveConfig = async (config: PlayerConfig): Promise<PlayerConfig> =>
-  configRepository.saveEditableConfig(config)
+  getConfigRepository().saveConfig(config)
 
-export const readConfigDocument = async (): Promise<StoredConfigDocument> =>
-  configRepository.readDocument()
+export const getConfigPath = (): string => getConfigRepository().getConfigPath()
 
-export const writeConfigDocument = async (
-  document: StoredConfigDocument
-): Promise<StoredConfigDocument> => configRepository.writeDocument(document)
-
-export { getConfigPath }
+export const getConfigDiagnostics = async (): Promise<ConfigDiagnostics> =>
+  getConfigRepository().getDiagnostics()

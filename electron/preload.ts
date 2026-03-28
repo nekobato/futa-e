@@ -6,6 +6,7 @@ import type { AssetPickOptions, FutaeApi } from '../src/shared/ipc'
 const api: FutaeApi = {
   config: {
     get: () => ipcRenderer.invoke('config:get'),
+    getDiagnostics: () => ipcRenderer.invoke('config:get-diagnostics'),
     getPlayback: () => ipcRenderer.invoke('config:get-playback'),
     save: (next) => ipcRenderer.invoke('config:save', next),
     onUpdated: (handler) => {

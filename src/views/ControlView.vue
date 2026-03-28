@@ -11,6 +11,7 @@
         <div class="status-cluster">
           <Tag value="自動保存" severity="secondary" />
           <Tag :value="statusLabel" severity="info" />
+          <Tag :value="persistenceModeLabel" severity="secondary" />
           <span class="surface-note"
             >接続ディスプレイ {{ displayInfos.length }} 台</span
           >
@@ -22,25 +23,30 @@
             label="再読込"
             icon="pi pi-refresh"
             severity="secondary"
+            :disabled="!isConfigReady"
             @click="loadConfig"
           />
           <Button
             label="開始"
             icon="pi pi-play"
             severity="success"
+            :disabled="!isConfigReady"
             @click="startPlayer"
           />
           <Button
             label="停止"
             icon="pi pi-stop"
             severity="secondary"
+            :disabled="!isConfigReady"
             @click="stopPlayer"
           />
         </div>
+
+        <span class="surface-note">{{ persistenceStatusLabel }}</span>
       </div>
     </header>
 
-    <div class="control-surface">
+    <div v-if="isConfigReady" class="control-surface">
       <section class="settings-section">
         <div class="section-heading">
           <div>
@@ -448,14 +454,19 @@
         </Splitter>
       </section>
     </div>
+
+    <div v-else class="control-surface">
+      <p class="surface-note">設定を読み込んでおります。</p>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, toRaw } from 'vue'
 import PlaylistEditor from '../components/PlaylistEditor.vue'
 import { getFutaeApi } from '../shared/api'
 import { createAutoSaveController } from '../shared/config-autosave'
+import type { ConfigDiagnostics } from '../shared/ipc'
 import {
   createDefaultConfig,
   createDefaultPlaylistConfig
@@ -489,6 +500,8 @@ const playlistDefaultDurationInputId = 'control-playlist-default-duration'
 const playlistWebTimeoutInputId = 'control-playlist-web-timeout'
 
 const config = ref<PlayerConfig>(createDefaultConfig())
+const configDiagnostics = ref<ConfigDiagnostics | null>(null)
+const isConfigReady = ref(false)
 const displayInfos = ref<DisplayInfo[]>([])
 const status = ref<PlayerStatus>({
   running: false,
@@ -500,6 +513,28 @@ const selectedPlaylistScope = ref('shared')
 let removeDisplayListener: (() => void) | null = null
 
 const statusLabel = computed(() => (status.value.running ? '再生中' : '停止中'))
+const persistenceModeLabel = computed(() => {
+  if (!configDiagnostics.value) {
+    return '保存先確認中'
+  }
+
+  return configDiagnostics.value.backend === 'electron-store'
+    ? 'Electron Store'
+    : 'ブラウザ Mock'
+})
+const persistenceStatusLabel = computed(() => {
+  if (!configDiagnostics.value) {
+    return '保存先を確認しております。'
+  }
+
+  if (configDiagnostics.value.backend !== 'electron-store') {
+    return 'ブラウザ mock で動作中です。electron-store は使用しておりません。'
+  }
+
+  return configDiagnostics.value.configExists
+    ? `保存先 ${configDiagnostics.value.configPath}`
+    : `保存先 ${configDiagnostics.value.configPath}（次回保存時に作成されます）`
+})
 const selectedPlaylist = computed(() =>
   getPlaylistById(
     config.value.playlists,
@@ -578,17 +613,15 @@ const syncSelection = () => {
 const syncDisplays = (displays: DisplayInfo[]) => {
   displayInfos.value = displays
   config.value = ensureDisplayConfigs(config.value, displays)
+  autoSave.touch()
   syncSelection()
 }
 
-const refreshDisplays = async () => {
-  syncDisplays(await api.displays.list())
-}
-
 const persistConfig = async (next: PlayerConfig) => {
+  const rawConfig = structuredClone(toRaw(next))
   const prepared = ensureDisplayConfigs(
     {
-      ...next,
+      ...rawConfig,
       updatedAt: new Date().toISOString()
     },
     displayInfos.value
@@ -605,13 +638,44 @@ const autoSave = createAutoSaveController({
   source: config
 })
 
+const updateConfigState = (
+  next: PlayerConfig,
+  options: {
+    syncCurrentSelection?: boolean
+    touchAutoSave?: boolean
+  } = {}
+) => {
+  const { syncCurrentSelection = true, touchAutoSave = true } = options
+
+  config.value = ensureDisplayConfigs(next, displayInfos.value)
+
+  if (touchAutoSave) {
+    autoSave.touch()
+  }
+
+  if (syncCurrentSelection) {
+    syncSelection()
+  }
+}
+
 const loadConfig = async () => {
   autoSave.pause()
-  config.value = await api.config.get()
-  await refreshDisplays()
-  status.value = await api.player.status()
+  isConfigReady.value = false
+  const [nextDiagnostics, nextConfig, nextDisplays, nextStatus] =
+    await Promise.all([
+      api.config.getDiagnostics(),
+      api.config.get(),
+      api.displays.list(),
+      api.player.status()
+    ])
+
+  configDiagnostics.value = nextDiagnostics
+  displayInfos.value = nextDisplays
+  config.value = ensureDisplayConfigs(nextConfig, nextDisplays)
   syncSelection()
   autoSave.resume(config.value)
+  status.value = nextStatus
+  isConfigReady.value = true
 }
 
 const selectPlaylist = (playlistId: string) => {
@@ -620,20 +684,19 @@ const selectPlaylist = (playlistId: string) => {
 }
 
 const setActivePlaylist = (playlistId: string) => {
-  config.value = ensureDisplayConfigs(
+  updateConfigState(
     {
       ...config.value,
       activePlaylistId: playlistId
     },
-    displayInfos.value
+    { syncCurrentSelection: true, touchAutoSave: true }
   )
-  syncSelection()
 }
 
 const setDisplayEnabled = (displayId: string, enabled: boolean) => {
   const displayConfig = getDisplayConfig(displayId)
 
-  config.value = ensureDisplayConfigs(
+  updateConfigState(
     {
       ...config.value,
       displays: {
@@ -644,7 +707,7 @@ const setDisplayEnabled = (displayId: string, enabled: boolean) => {
         }
       }
     },
-    displayInfos.value
+    { syncCurrentSelection: false, touchAutoSave: true }
   )
 }
 
@@ -680,13 +743,13 @@ const updateSelectedSharedPlaylist = (playlist: PlaylistItem[]) => {
         )
       )
 
-  config.value = ensureDisplayConfigs(
+  updateConfigState(
     {
       ...config.value,
       playlists: nextPlaylists,
       displays: nextDisplays
     },
-    displayInfos.value
+    { syncCurrentSelection: false, touchAutoSave: true }
   )
 }
 
@@ -696,7 +759,7 @@ const updateSelectedDisplayPlaylist = (
 ) => {
   const displayConfig = getDisplayConfig(displayId)
 
-  config.value = ensureDisplayConfigs(
+  updateConfigState(
     {
       ...config.value,
       displays: {
@@ -711,12 +774,12 @@ const updateSelectedDisplayPlaylist = (
         }
       }
     },
-    displayInfos.value
+    { syncCurrentSelection: false, touchAutoSave: true }
   )
 }
 
 const renameSelectedPlaylist = (name: string) => {
-  config.value = ensureDisplayConfigs(
+  updateConfigState(
     {
       ...config.value,
       playlists: replacePlaylistNameById(
@@ -725,7 +788,7 @@ const renameSelectedPlaylist = (name: string) => {
         name
       )
     },
-    displayInfos.value
+    { syncCurrentSelection: false, touchAutoSave: true }
   )
 }
 
@@ -752,13 +815,13 @@ const toggleSelectedPlaylistPerDisplay = (enabled: boolean) => {
     ])
   )
 
-  config.value = ensureDisplayConfigs(
+  updateConfigState(
     {
       ...config.value,
       playlists: nextPlaylists,
       displays: nextDisplays
     },
-    displayInfos.value
+    { syncCurrentSelection: true, touchAutoSave: true }
   )
   selectedPlaylistScope.value = 'shared'
 }
@@ -771,7 +834,7 @@ const updateSelectedPlaylistSettings = (
     >
   >
 ) => {
-  config.value = ensureDisplayConfigs(
+  updateConfigState(
     {
       ...config.value,
       playlists: replacePlaylistSettingsById(
@@ -780,7 +843,7 @@ const updateSelectedPlaylistSettings = (
         settings
       )
     },
-    displayInfos.value
+    { syncCurrentSelection: false, touchAutoSave: true }
   )
 }
 
@@ -816,12 +879,12 @@ const addPlaylist = () => {
   const playlist = createDefaultPlaylistConfig(nextPlaylistName())
   const nextPlaylists = [...config.value.playlists, playlist]
 
-  config.value = ensureDisplayConfigs(
+  updateConfigState(
     {
       ...config.value,
       playlists: nextPlaylists
     },
-    displayInfos.value
+    { syncCurrentSelection: false, touchAutoSave: true }
   )
   selectedPlaylistId.value = playlist.id
   selectedPlaylistScope.value = 'shared'
@@ -866,13 +929,13 @@ const duplicateSelectedPlaylist = () => {
     })
   )
 
-  config.value = ensureDisplayConfigs(
+  updateConfigState(
     {
       ...config.value,
       playlists: nextPlaylists,
       displays: nextDisplays
     },
-    displayInfos.value
+    { syncCurrentSelection: false, touchAutoSave: true }
   )
   selectedPlaylistId.value = duplicateId
   selectedPlaylistScope.value = 'shared'
@@ -891,7 +954,7 @@ const removeSelectedPlaylist = () => {
   const fallbackPlaylist =
     nextPlaylists[removeIndex] ?? nextPlaylists[removeIndex - 1]
 
-  config.value = ensureDisplayConfigs(
+  updateConfigState(
     {
       ...config.value,
       activePlaylistId:
@@ -913,7 +976,7 @@ const removeSelectedPlaylist = () => {
         )
       )
     },
-    displayInfos.value
+    { syncCurrentSelection: false, touchAutoSave: true }
   )
   selectedPlaylistId.value = fallbackPlaylist.id
   selectedPlaylistScope.value = 'shared'
@@ -931,12 +994,12 @@ const moveSelectedPlaylist = (offset: -1 | 1) => {
   const [moved] = nextPlaylists.splice(from, 1)
   nextPlaylists.splice(to, 0, moved)
 
-  config.value = ensureDisplayConfigs(
+  updateConfigState(
     {
       ...config.value,
       playlists: nextPlaylists
     },
-    displayInfos.value
+    { syncCurrentSelection: false, touchAutoSave: true }
   )
   selectedPlaylistId.value = moved.id
 }

@@ -11,9 +11,16 @@ export type AssetPickOptions = {
   kind?: 'image' | 'video' | 'media'
 }
 
+export type ConfigDiagnostics = {
+  backend: 'electron-store' | 'browser-mock'
+  configExists: boolean
+  configPath: string | null
+}
+
 export type FutaeApi = {
   config: {
     get: () => Promise<PlayerConfig>
+    getDiagnostics: () => Promise<ConfigDiagnostics>
     getPlayback: () => Promise<PlayerConfig>
     save: (next: PlayerConfig) => Promise<PlayerConfig>
     onUpdated: (handler: (config: PlayerConfig) => void) => () => void

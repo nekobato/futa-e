@@ -22,8 +22,8 @@ playlist item は少なくとも次の情報を持つ。
 
 - `id`
 - `type`
-- `title`
 - `src`
+- `originUrl`
 - `durationSec`
 - `fallbackSrc`
 - `mute`
@@ -75,20 +75,31 @@ playlist item は少なくとも次の情報を持つ。
 ローカル設定の形式は、当面は次のような形を想定する。
 
 ```ts
+type PlaylistItem = {
+  id: string
+  type: 'image' | 'video' | 'web'
+  src: string
+  originUrl?: string
+  durationSec?: number
+  fallbackSrc?: string
+  mute?: boolean
+}
+
 type PlaylistConfig = {
   id: string
   name: string
   perDisplay: boolean
+  loop: boolean
+  shuffle: boolean
+  defaultDurationSec: number
+  webTimeoutSec: number
   items: PlaylistItem[]
 }
 
 type PlayerConfig = {
   version: 1
+  activePlaylistId: string
   playlists: PlaylistConfig[]
-  loop: boolean
-  shuffle: boolean
-  defaultDurationSec: number
-  webTimeoutSec: number
   displays: Record<string, DisplayConfig>
   updatedAt: string
 }
@@ -101,6 +112,8 @@ type DisplayConfig = {
 
 - 先頭の playlist の `perDisplay = false` なら全モニターで共通設定を使う
 - 先頭の playlist の `perDisplay = true` なら `displays` の設定を優先する
+- ローカル保存ファイルには `cloud` object を持たせない
+- 将来 Cloud 連携を追加する場合も、取得データは API から供給し、ローカル設定仕様へ常設しない
 - 現在の UI は先頭の playlist を編集対象にする
 - 将来 Manifest を定義する場合も、このローカル設定との差分が小さくなるように寄せる
 
@@ -116,7 +129,6 @@ type DisplayConfig = {
 
 playlist に追加済みの item ごとに、将来的には次の編集をできるようにしてよい。
 
-- `title`
 - `durationSec`
 - `fallbackSrc`
 - `mute`

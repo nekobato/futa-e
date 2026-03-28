@@ -40,7 +40,6 @@ describe('player-config helpers', () => {
           {
             id: 'item-1',
             type: 'image',
-            title: 'Item 1',
             src: '/safe-mode.svg'
           }
         ]
@@ -128,7 +127,6 @@ describe('player-config helpers', () => {
           {
             id: 'shared-2',
             type: 'image',
-            title: 'Shared',
             src: '/safe-mode.svg'
           }
         ]

@@ -3,7 +3,6 @@ export type AssetType = 'image' | 'video' | 'web'
 export type PlaylistItem = {
   id: string
   type: AssetType
-  title: string
   src: string
   originUrl?: string
   durationSec?: number

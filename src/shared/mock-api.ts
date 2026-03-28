@@ -6,7 +6,7 @@ import type {
   PlayerConfig,
   PlayerStatus
 } from './types'
-import type { AssetPickOptions, FutaeApi } from './ipc'
+import type { AssetPickOptions, ConfigDiagnostics, FutaeApi } from './ipc'
 import { coerceConfig, createDefaultConfig } from './defaults'
 import { inferAssetTypeFromPath } from './picked-assets'
 import { countEnabledDisplays, ensureDisplayConfigs } from './player-config'
@@ -220,6 +220,13 @@ const writeConfig = async (config: PlayerConfig): Promise<PlayerConfig> => {
   return normalized
 }
 
+/** Returns diagnostics for the browser-backed mock configuration store. */
+const readConfigDiagnostics = async (): Promise<ConfigDiagnostics> => ({
+  backend: 'browser-mock',
+  configExists: false,
+  configPath: null
+})
+
 const noopCache = async (
   _url: string,
   _type: AssetType
@@ -231,6 +238,7 @@ export const createBrowserMockApi = (): FutaeApi => {
   return {
     config: {
       get: async () => readConfig(),
+      getDiagnostics: async () => readConfigDiagnostics(),
       getPlayback: async () => readConfig(),
       save: async (next) => writeConfig(next),
       onUpdated: (handler) => {

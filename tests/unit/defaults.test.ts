@@ -74,6 +74,7 @@ describe('config coercion', () => {
       id: 'legacy-main',
       src: '/main.png'
     })
+    expect(config.playlists[0]?.items[0]).not.toHaveProperty('title')
     expect(config.playlists[1]).toMatchObject({
       name: 'プレイリスト 2',
       perDisplay: true,
@@ -84,8 +85,8 @@ describe('config coercion', () => {
     })
     expect(config.playlists[1]?.items[0]).toMatchObject({
       type: 'image',
-      src: '/cover.png',
-      title: 'cover.png'
+      src: '/cover.png'
     })
+    expect(config.playlists[1]?.items[0]).not.toHaveProperty('title')
   })
 })

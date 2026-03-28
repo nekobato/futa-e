@@ -19,7 +19,12 @@ import {
   dialogExtensionsForKind,
   toPickedAssetFromPath
 } from '../src/shared/picked-assets'
-import { loadConfig, loadPlaybackConfig, saveConfig } from './config'
+import {
+  getConfigDiagnostics,
+  loadConfig,
+  loadPlaybackConfig,
+  saveConfig
+} from './config'
 import { shouldExitPlayerWindows } from './player-window-input'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -372,6 +377,8 @@ app.on('will-quit', () => {
 })
 
 ipcMain.handle('config:get', () => editableConfig)
+
+ipcMain.handle('config:get-diagnostics', async () => getConfigDiagnostics())
 
 ipcMain.handle('config:get-playback', () => playbackConfig)
 
