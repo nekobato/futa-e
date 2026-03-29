@@ -26,6 +26,7 @@ import {
   saveConfig
 } from './config'
 import { shouldExitPlayerWindows } from './player-window-input'
+import { applyPlayerWindowPresentation } from './player-window'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -274,16 +275,7 @@ const createPlayerWindows = () => {
     })
 
     win.once('ready-to-show', () => {
-      win.setAlwaysOnTop(true)
-      win.setFullScreenable(false)
-      win.setFullScreen(true)
-      win.setKiosk(true)
-      if (process.platform !== 'win32') {
-        win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-      }
-      win.show()
-      win.focus()
-      win.moveTop()
+      applyPlayerWindowPresentation(win)
     })
 
     win.webContents.on('unresponsive', () => {

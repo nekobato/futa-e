@@ -33,7 +33,8 @@ test('shows per-display editors when individual monitor settings are enabled', a
 
   await page.goto('/?view=control')
 
-  await expect(page.getByText('接続ディスプレイ 2 台')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Futa E' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '開始' })).toBeVisible()
   await expect(
     page.getByRole('heading', { name: 'プレイリスト' })
   ).toBeVisible()
@@ -53,4 +54,25 @@ test('shows per-display editors when individual monitor settings are enabled', a
     page.getByRole('tab', { name: 'Built-in Display' })
   ).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Studio Display' })).toBeVisible()
+})
+
+test('adds playlist items through the add-item dialog', async ({ page }) => {
+  await page.goto('/?view=control')
+
+  await expect(page.getByTestId('playlist-item-add-button')).toBeVisible()
+
+  await page.getByTestId('playlist-item-add-button').click()
+
+  await expect(
+    page.getByRole('dialog', { name: 'プレイリスト項目を追加' })
+  ).toBeVisible()
+
+  await page.getByRole('button', { name: 'ウェブ' }).click()
+  await page.getByLabel('URL').fill('https://example.com/signage')
+  await page.getByRole('button', { name: '決定' }).click()
+
+  await expect(
+    page.getByRole('dialog', { name: 'プレイリスト項目を追加' })
+  ).not.toBeVisible()
+  await expect(page.getByText('example.com/signage')).toBeVisible()
 })

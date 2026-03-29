@@ -1,269 +1,310 @@
 <template>
   <div class="panel-content">
-    <div class="playlist-composer">
-      <div class="field">
-        <label :id="typeLabelId">種類</label>
-        <SelectButton
-          :modelValue="draftType"
-          :options="typeOptions"
-          optionLabel="label"
-          optionValue="value"
-          :allowEmpty="false"
-          :ariaLabelledby="typeLabelId"
-          size="small"
-          class="choice-group"
-          @update:modelValue="handleDraftTypeChange"
-        />
-      </div>
-
-      <div v-if="draftType !== 'web'" class="field">
-        <label :id="sourceModeLabelId">入力方法</label>
-        <SelectButton
-          :modelValue="draftSourceMode"
-          :options="sourceModeOptions"
-          optionLabel="label"
-          optionValue="value"
-          :allowEmpty="false"
-          :ariaLabelledby="sourceModeLabelId"
-          size="small"
-          class="choice-group"
-          @update:modelValue="handleDraftSourceModeChange"
-        />
-      </div>
-
-      <div v-if="draftSourceMode === 'url'" class="field">
-        <label :for="urlInputId">URL</label>
-        <InputText
-          :id="urlInputId"
-          v-model="urlInput"
-          placeholder="https://example.com/asset"
-          class="w-full"
-        />
-      </div>
-
-      <div v-else class="field-inline">
-        <div class="field-copy">
-          <strong>{{ fileSelectionTitle }}</strong>
-          <p class="surface-note">{{ selectedAssetsLabel }}</p>
-        </div>
-
-        <div class="row">
-          <Button
-            label="ファイルを選択"
-            icon="pi pi-images"
-            severity="secondary"
-            @click="pickDraftFiles"
-          />
-          <Button
-            v-if="draftAssets.length > 0"
-            label="クリア"
-            icon="pi pi-times"
-            severity="secondary"
-            text
-            @click="clearDraftFiles"
-          />
-        </div>
-      </div>
-
-      <div v-if="showDraftDuration" class="field">
-        <label :for="urlDurationInputId">表示時間（秒）</label>
-        <InputNumber
-          :inputId="urlDurationInputId"
-          v-model="urlDuration"
-          :min="draftType === 'video' ? undefined : 2"
-          :max="36000"
-          placeholder="自動"
-        />
-      </div>
-
-      <div
-        v-if="allowFallback && draftType === 'web'"
-        class="field-inline field-inline-toggle"
-      >
-        <div class="field-copy">
-          <label :for="draftFallbackEnabledId">待機・失敗時の表示</label>
-          <p class="surface-note">
-            Web の読込待機中または失敗時だけ、代わりの画像を表示します。
+    <section class="playlist-items-shell">
+      <div class="playlist-items-header">
+        <div class="playlist-items-copy">
+          <strong class="playlist-items-title">プレイリスト項目</strong>
+          <p class="playlist-meta">
+            {{ playlist.length }} 件を表示しています。
+            <span v-if="singleItemMode">
+              追加すると現在の項目を置き換えます。
+            </span>
           </p>
         </div>
-        <Checkbox
-          v-model="draftFallbackEnabled"
-          :inputId="draftFallbackEnabledId"
-          binary
-          @update:modelValue="handleDraftFallbackToggle"
-        />
-      </div>
 
-      <div
-        v-if="allowFallback && draftType === 'web' && draftFallbackEnabled"
-        class="field-inline"
-      >
-        <div class="field-copy">
-          <strong>フォールバック画像</strong>
-          <p class="surface-note">{{ draftFallbackLabel }}</p>
-        </div>
-
-        <div class="row">
-          <Button
-            label="画像を選択"
-            icon="pi pi-image"
-            severity="secondary"
-            @click="pickDraftFallback"
-          />
-          <Button
-            v-if="draftFallback"
-            label="クリア"
-            icon="pi pi-times"
-            severity="secondary"
-            text
-            @click="clearDraftFallback"
-          />
-        </div>
-      </div>
-
-      <div class="row">
         <Button
           label="追加"
           icon="pi pi-plus"
-          :disabled="!canAddDraft"
-          @click="addDraft"
+          size="small"
+          data-testid="playlist-item-add-button"
+          @click="openDraftDialog"
         />
-        <p v-if="singleItemMode" class="surface-note">
-          追加すると現在の項目を置き換えます。
-        </p>
       </div>
-    </div>
 
-    <Divider />
-
-    <p v-if="playlist.length === 0" class="playlist-meta">
-      {{ emptyMessage }}
-    </p>
-
-    <div v-else class="playlist-list">
-      <div
-        v-for="(item, index) in playlist"
-        :key="item.id"
-        class="playlist-item"
+      <p
+        v-if="playlist.length === 0"
+        class="playlist-meta playlist-empty-state"
       >
-        <div class="playlist-item-header">
-          <strong>{{ itemLabel(item) }}</strong>
-          <Tag :value="itemTypeLabel(item.type)" />
-        </div>
+        {{ emptyMessage }}
+      </p>
 
-        <div class="playlist-meta">
-          {{ item.originUrl ? 'キャッシュ元: ' + item.originUrl : item.src }}
-        </div>
-
-        <div v-if="showItemSettings" class="playlist-fields">
-          <div class="field-grid field-grid-2">
-            <div class="field">
-              <label :for="`playlist-duration-${item.id}`"
-                >表示時間（秒）</label
-              >
-              <InputNumber
-                :inputId="`playlist-duration-${item.id}`"
-                :modelValue="item.durationSec ?? null"
-                :min="item.type === 'video' ? undefined : 2"
-                :max="36000"
-                placeholder="自動"
-                @update:modelValue="
-                  updateItem(index, {
-                    durationSec: normalizeDuration(item.type, $event)
-                  })
-                "
-              />
-            </div>
-
-            <div v-if="item.type === 'video'" class="field-inline">
-              <label :for="`playlist-mute-${item.id}`">ミュート</label>
-              <ToggleSwitch
-                :inputId="`playlist-mute-${item.id}`"
-                :modelValue="item.mute ?? false"
-                @update:modelValue="
-                  updateItem(index, { mute: Boolean($event) })
-                "
-              />
-            </div>
+      <div v-else class="playlist-list">
+        <div
+          v-for="(item, index) in playlist"
+          :key="item.id"
+          class="playlist-item"
+        >
+          <div class="playlist-item-header">
+            <strong>{{ itemLabel(item) }}</strong>
+            <Tag :value="itemTypeLabel(item.type)" />
           </div>
 
-          <template v-if="allowFallback && item.type === 'web'">
-            <div class="field-inline field-inline-toggle">
-              <div class="field-copy">
-                <label :for="`playlist-fallback-enabled-${item.id}`"
-                  >待機・失敗時の表示</label
+          <div class="playlist-meta">
+            {{ item.originUrl ? 'キャッシュ元: ' + item.originUrl : item.src }}
+          </div>
+
+          <div v-if="showItemSettings" class="playlist-fields">
+            <div class="field-grid field-grid-2">
+              <div class="field">
+                <label :for="`playlist-duration-${item.id}`"
+                  >表示時間（秒）</label
                 >
-                <p class="surface-note">
-                  Web の読込待機中または失敗時だけ、代わりの画像を表示します。
-                </p>
-              </div>
-              <Checkbox
-                :inputId="`playlist-fallback-enabled-${item.id}`"
-                :modelValue="isFallbackEnabled(item.id)"
-                binary
-                @update:modelValue="
-                  toggleItemFallback(index, item.id, Boolean($event))
-                "
-              />
-            </div>
-
-            <div v-if="isFallbackEnabled(item.id)" class="field-inline">
-              <div class="field-copy">
-                <strong>フォールバック画像</strong>
-                <p class="surface-note">
-                  {{ fallbackLabel(item.fallbackSrc) }}
-                </p>
-              </div>
-
-              <div class="row">
-                <Button
-                  label="画像を選択"
-                  icon="pi pi-image"
-                  severity="secondary"
-                  @click="pickItemFallback(index, item.id)"
+                <InputNumber
+                  :inputId="`playlist-duration-${item.id}`"
+                  :modelValue="item.durationSec ?? null"
+                  :min="item.type === 'video' ? undefined : 2"
+                  :max="36000"
+                  placeholder="自動"
+                  @update:modelValue="
+                    updateItem(index, {
+                      durationSec: normalizeDuration(item.type, $event)
+                    })
+                  "
                 />
-                <Button
-                  v-if="item.fallbackSrc"
-                  label="クリア"
-                  icon="pi pi-times"
-                  severity="secondary"
-                  text
-                  @click="clearItemFallback(index, item.id)"
+              </div>
+
+              <div v-if="item.type === 'video'" class="field-inline">
+                <label :for="`playlist-mute-${item.id}`">ミュート</label>
+                <ToggleSwitch
+                  :inputId="`playlist-mute-${item.id}`"
+                  :modelValue="item.mute ?? false"
+                  @update:modelValue="
+                    updateItem(index, { mute: Boolean($event) })
+                  "
                 />
               </div>
             </div>
-          </template>
-        </div>
 
-        <div class="playlist-item-actions">
-          <Button
-            v-if="!singleItemMode"
-            icon="pi pi-arrow-up"
-            text
-            severity="secondary"
-            aria-label="項目を上へ移動"
-            :disabled="index === 0"
-            @click="moveItem(index, -1)"
-          />
-          <Button
-            v-if="!singleItemMode"
-            icon="pi pi-arrow-down"
-            text
-            severity="secondary"
-            aria-label="項目を下へ移動"
-            :disabled="index === playlist.length - 1"
-            @click="moveItem(index, 1)"
-          />
-          <Button
-            icon="pi pi-trash"
-            text
-            severity="danger"
-            aria-label="項目を削除"
-            @click="removeItem(index)"
-          />
+            <template v-if="allowFallback && item.type === 'web'">
+              <div class="field-inline field-inline-toggle">
+                <div class="field-copy">
+                  <label :for="`playlist-fallback-enabled-${item.id}`"
+                    >待機・失敗時の表示</label
+                  >
+                  <p class="surface-note">
+                    Web の読込待機中または失敗時だけ、代わりの画像を表示します。
+                  </p>
+                </div>
+                <Checkbox
+                  :inputId="`playlist-fallback-enabled-${item.id}`"
+                  :modelValue="isFallbackEnabled(item.id)"
+                  binary
+                  @update:modelValue="
+                    toggleItemFallback(index, item.id, Boolean($event))
+                  "
+                />
+              </div>
+
+              <div v-if="isFallbackEnabled(item.id)" class="field-inline">
+                <div class="field-copy">
+                  <strong>フォールバック画像</strong>
+                  <p class="surface-note">
+                    {{ fallbackLabel(item.fallbackSrc) }}
+                  </p>
+                </div>
+
+                <div class="row">
+                  <Button
+                    label="画像を選択"
+                    icon="pi pi-image"
+                    severity="secondary"
+                    @click="pickItemFallback(index, item.id)"
+                  />
+                  <Button
+                    v-if="item.fallbackSrc"
+                    label="クリア"
+                    icon="pi pi-times"
+                    severity="secondary"
+                    text
+                    @click="clearItemFallback(index, item.id)"
+                  />
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div class="playlist-item-actions">
+            <Button
+              v-if="!singleItemMode"
+              icon="pi pi-arrow-up"
+              text
+              severity="secondary"
+              aria-label="項目を上へ移動"
+              :disabled="index === 0"
+              @click="moveItem(index, -1)"
+            />
+            <Button
+              v-if="!singleItemMode"
+              icon="pi pi-arrow-down"
+              text
+              severity="secondary"
+              aria-label="項目を下へ移動"
+              :disabled="index === playlist.length - 1"
+              @click="moveItem(index, 1)"
+            />
+            <Button
+              icon="pi pi-trash"
+              text
+              severity="danger"
+              aria-label="項目を削除"
+              @click="removeItem(index)"
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </section>
+
+    <Dialog
+      v-model:visible="isDraftDialogVisible"
+      modal
+      header="プレイリスト項目を追加"
+      :style="{ width: '42rem' }"
+      :breakpoints="{ '960px': '92vw' }"
+      class="playlist-dialog"
+    >
+      <div class="playlist-composer">
+        <div class="field">
+          <label :id="typeLabelId">種類</label>
+          <SelectButton
+            :modelValue="draftType"
+            :options="typeOptions"
+            optionLabel="label"
+            optionValue="value"
+            :allowEmpty="false"
+            :ariaLabelledby="typeLabelId"
+            size="small"
+            class="choice-group"
+            @update:modelValue="handleDraftTypeChange"
+          />
+        </div>
+
+        <div v-if="draftType !== 'web'" class="field">
+          <label :id="sourceModeLabelId">入力方法</label>
+          <SelectButton
+            :modelValue="draftSourceMode"
+            :options="sourceModeOptions"
+            optionLabel="label"
+            optionValue="value"
+            :allowEmpty="false"
+            :ariaLabelledby="sourceModeLabelId"
+            size="small"
+            class="choice-group"
+            @update:modelValue="handleDraftSourceModeChange"
+          />
+        </div>
+
+        <div v-if="draftSourceMode === 'url'" class="field">
+          <label :for="urlInputId">URL</label>
+          <InputText
+            :id="urlInputId"
+            v-model="urlInput"
+            placeholder="https://example.com/asset"
+            class="w-full"
+          />
+        </div>
+
+        <div v-else class="field-inline">
+          <div class="field-copy">
+            <strong>{{ fileSelectionTitle }}</strong>
+            <p class="surface-note">{{ selectedAssetsLabel }}</p>
+          </div>
+
+          <div class="row">
+            <Button
+              label="ファイルを選択"
+              icon="pi pi-images"
+              severity="secondary"
+              @click="pickDraftFiles"
+            />
+            <Button
+              v-if="draftAssets.length > 0"
+              label="クリア"
+              icon="pi pi-times"
+              severity="secondary"
+              text
+              @click="clearDraftFiles"
+            />
+          </div>
+        </div>
+
+        <div v-if="showDraftDuration" class="field">
+          <label :for="urlDurationInputId">表示時間（秒）</label>
+          <InputNumber
+            :inputId="urlDurationInputId"
+            v-model="urlDuration"
+            :min="draftType === 'video' ? undefined : 2"
+            :max="36000"
+            placeholder="自動"
+          />
+        </div>
+
+        <div
+          v-if="allowFallback && draftType === 'web'"
+          class="field-inline field-inline-toggle"
+        >
+          <div class="field-copy">
+            <label :for="draftFallbackEnabledId">待機・失敗時の表示</label>
+            <p class="surface-note">
+              Web の読込待機中または失敗時だけ、代わりの画像を表示します。
+            </p>
+          </div>
+          <Checkbox
+            v-model="draftFallbackEnabled"
+            :inputId="draftFallbackEnabledId"
+            binary
+            @update:modelValue="handleDraftFallbackToggle"
+          />
+        </div>
+
+        <div
+          v-if="allowFallback && draftType === 'web' && draftFallbackEnabled"
+          class="field-inline"
+        >
+          <div class="field-copy">
+            <strong>フォールバック画像</strong>
+            <p class="surface-note">{{ draftFallbackLabel }}</p>
+          </div>
+
+          <div class="row">
+            <Button
+              label="画像を選択"
+              icon="pi pi-image"
+              severity="secondary"
+              @click="pickDraftFallback"
+            />
+            <Button
+              v-if="draftFallback"
+              label="クリア"
+              icon="pi pi-times"
+              severity="secondary"
+              text
+              @click="clearDraftFallback"
+            />
+          </div>
+        </div>
+
+        <p v-if="singleItemMode" class="surface-note playlist-dialog-note">
+          決定すると現在の項目を置き換えます。
+        </p>
+      </div>
+
+      <template #footer>
+        <div class="playlist-dialog-actions">
+          <Button
+            label="キャンセル"
+            severity="secondary"
+            text
+            @click="closeDraftDialog"
+          />
+          <Button
+            label="決定"
+            icon="pi pi-check"
+            :disabled="!canAddDraft"
+            @click="submitDraft"
+          />
+        </div>
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -314,6 +355,7 @@ const draftAssets = ref<PickedAsset[]>([])
 const draftFallback = ref<string | null>(null)
 const draftFallbackEnabled = ref(false)
 const fallbackVisibility = ref<Record<string, boolean>>({})
+const isDraftDialogVisible = ref(false)
 
 const typeOptions: Array<{ label: string; value: AssetType }> = [
   { label: '画像', value: 'image' },
@@ -369,6 +411,18 @@ watch(
 const emitPlaylist = (next: PlaylistItem[]) => {
   emit('update:playlist', next)
   emit('changed')
+}
+
+/** Opens the add-item dialog with a clean draft state. */
+const openDraftDialog = () => {
+  resetDraft()
+  isDraftDialogVisible.value = true
+}
+
+/** Closes the add-item dialog and clears the current draft state. */
+const closeDraftDialog = () => {
+  isDraftDialogVisible.value = false
+  resetDraft()
 }
 
 const normalizeDuration = (
@@ -479,15 +533,15 @@ const clearDraftFallback = () => {
   draftFallback.value = null
 }
 
-const addDraft = async () => {
+const addDraft = async (): Promise<boolean> => {
   if (!canAddDraft.value) {
-    return
+    return false
   }
 
   if (draftSourceMode.value === 'file') {
     emitPlaylist(mergePlaylist(draftAssets.value.map(buildItem)))
     resetDraft()
-    return
+    return true
   }
 
   const trimmed = urlInput.value.trim()
@@ -520,6 +574,17 @@ const addDraft = async () => {
   )
 
   resetDraft()
+  return true
+}
+
+/** Commits the draft from the dialog into the playlist and closes the dialog. */
+const submitDraft = async () => {
+  const added = await addDraft()
+  if (!added) {
+    return
+  }
+
+  isDraftDialogVisible.value = false
 }
 
 const updateItem = (index: number, patch: Partial<PlaylistItem>) => {
