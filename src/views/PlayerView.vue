@@ -372,3 +372,45 @@ onBeforeUnmount(() => {
   }
 })
 </script>
+
+<style lang="scss">
+.player-stage {
+  width: 100vw;
+  height: 100vh;
+  background: #0b0b0b;
+  position: relative;
+  overflow: hidden;
+}
+
+.player-media {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+
+  img,
+  video,
+  iframe {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border: none;
+  }
+}
+
+.player-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  text-align: center;
+  padding: 40px;
+
+  img {
+    width: min(420px, 60vw);
+    margin-bottom: 20px;
+  }
+}
+</style>

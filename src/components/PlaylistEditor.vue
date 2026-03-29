@@ -658,3 +658,218 @@ const removeItem = (index: number) => {
   emitPlaylist(props.playlist.filter((_, itemIndex) => itemIndex !== index))
 }
 </script>
+
+<style lang="scss">
+.panel-content,
+.playlist-dialog {
+  .surface-note,
+  .playlist-meta {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+
+  .row,
+  .playlist-item-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .field-grid {
+    display: grid;
+    gap: 14px;
+
+    &-2 {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+  }
+
+  .field {
+    display: grid;
+    gap: 8px;
+
+    label {
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    :where(.p-inputnumber, .p-select, .p-inputtext),
+    .p-inputnumber-input,
+    .p-select-label {
+      width: 100%;
+    }
+  }
+
+  .field-inline {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface-strong);
+
+    label {
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    > :not(.field-copy) {
+      flex: 0 0 auto;
+    }
+
+    &-toggle {
+      align-items: flex-start;
+    }
+  }
+
+  .field-copy {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    flex: 1 1 240px;
+
+    strong {
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+  }
+
+  .w-full {
+    width: 100%;
+  }
+
+  :where(.p-inputtext, .p-inputnumber-input) {
+    background: var(--p-form-field-background);
+    border: 1px solid var(--p-form-field-border-color);
+    color: var(--p-form-field-color);
+    min-height: 36px;
+    font-size: 14px;
+
+    &::placeholder {
+      color: var(--p-form-field-placeholder-color);
+    }
+
+    &:focus {
+      border-color: var(--focus-line);
+      box-shadow: 0 0 0 3px var(--focus-ring);
+    }
+  }
+
+  :where(.p-button) {
+    white-space: nowrap;
+    min-height: 34px;
+
+    &.p-button-text {
+      min-height: 30px;
+    }
+  }
+}
+
+.panel-content,
+.playlist-composer,
+.playlist-items-shell,
+.playlist-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.playlist-items-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.playlist-items-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.playlist-items-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.playlist-empty-state {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px dashed var(--line-strong);
+  background: color-mix(in srgb, var(--panel-soft), transparent 34%);
+}
+
+.choice-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+
+  &:where(.p-selectbutton) {
+    gap: 0;
+    align-self: flex-start;
+  }
+}
+
+.playlist-list {
+  display: grid;
+  gap: 10px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.playlist-item {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-soft-strong);
+}
+
+.playlist-dialog {
+  :where(.p-dialog-header) {
+    padding: 16px 18px 12px;
+  }
+
+  :where(.p-dialog-content) {
+    padding: 0 18px 8px;
+  }
+
+  :where(.p-dialog-footer) {
+    padding: 12px 18px 16px;
+    border-top: 1px solid var(--line-subtle);
+  }
+}
+
+.playlist-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.playlist-dialog-note {
+  margin: 0;
+}
+
+.playlist-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+
+  strong {
+    min-width: 0;
+    text-wrap: balance;
+  }
+}
+</style>

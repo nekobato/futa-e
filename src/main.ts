@@ -18,7 +18,6 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 
 import 'primeicons/primeicons.css'
-import './styles.css'
 import App from './App.vue'
 import { QuietAtelier } from './theme/quietAtelier'
 
