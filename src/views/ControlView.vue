@@ -14,61 +14,45 @@
 
     <div v-if="isConfigReady" class="settings-window">
       <main class="settings-main">
-        <section id="playback-section" class="settings-card">
-          <div class="section-heading section-heading-compact">
-            <div>
-              <p class="section-kicker">システム</p>
-              <h2>再生とディスプレイ</h2>
+        <section class="settings-block settings-block-tone">
+          <header>
+            <h2>ディスプレイ</h2>
+          </header>
+          <div v-if="displayInfos.length > 0" class="display-list">
+            <div
+              v-for="display in displayInfos"
+              :key="display.id"
+              class="display-summary display-summary-dense"
+            >
+              <div class="display-copy">
+                <strong>{{ display.label }}</strong>
+                <span class="surface-note">
+                  {{ display.bounds.width }} x {{ display.bounds.height }}
+                </span>
+              </div>
+
+              <div class="display-summary-actions">
+                <Tag
+                  :value="display.isPrimary ? 'メイン' : '画面'"
+                  severity="secondary"
+                />
+                <div class="field-inline field-inline-compact">
+                  <label :for="displayEnabledInputId(display.id)">有効</label>
+                  <ToggleSwitch
+                    :inputId="displayEnabledInputId(display.id)"
+                    :modelValue="config.displays[display.id]?.enabled ?? true"
+                    @update:modelValue="
+                      setDisplayEnabled(display.id, Boolean($event))
+                    "
+                  />
+                </div>
+              </div>
             </div>
-            <p class="section-copy">
-              接続中ディスプレイの有効状態をここで整えます。
-            </p>
           </div>
 
-          <section class="settings-block settings-block-tone">
-            <header class="subsection-heading">
-              <div>
-                <h3>ディスプレイ</h3>
-                <p>有効を切ると、個別設定を使う再生時だけ対象から外れます。</p>
-              </div>
-            </header>
-
-            <div v-if="displayInfos.length > 0" class="display-list">
-              <div
-                v-for="display in displayInfos"
-                :key="display.id"
-                class="display-summary display-summary-dense"
-              >
-                <div class="display-copy">
-                  <strong>{{ display.label }}</strong>
-                  <span class="surface-note">
-                    {{ display.bounds.width }} x {{ display.bounds.height }}
-                  </span>
-                </div>
-
-                <div class="display-summary-actions">
-                  <Tag
-                    :value="display.isPrimary ? 'メイン' : '画面'"
-                    severity="secondary"
-                  />
-                  <div class="field-inline field-inline-compact">
-                    <label :for="displayEnabledInputId(display.id)">有効</label>
-                    <ToggleSwitch
-                      :inputId="displayEnabledInputId(display.id)"
-                      :modelValue="config.displays[display.id]?.enabled ?? true"
-                      @update:modelValue="
-                        setDisplayEnabled(display.id, Boolean($event))
-                      "
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <p v-else class="surface-note">
-              ディスプレイはまだ検出できておりません。
-            </p>
-          </section>
+          <p v-else class="surface-note">
+            ディスプレイはまだ検出できておりません。
+          </p>
         </section>
 
         <section
