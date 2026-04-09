@@ -1,7 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { pathToFileURL } from 'node:url'
 import type { AssetType } from '../src/shared/types'
 import type { AssetPickOptions, FutaeApi } from '../src/shared/ipc'
+
+const LOCAL_MEDIA_SCHEME = 'futae-media'
 
 const api: FutaeApi = {
   config: {
@@ -40,7 +41,8 @@ const api: FutaeApi = {
     heartbeat: () => ipcRenderer.send('player:heartbeat')
   },
   utils: {
-    toFileUrl: (filePath: string) => pathToFileURL(filePath).toString()
+    toFileUrl: (filePath: string) =>
+      `${LOCAL_MEDIA_SCHEME}://local/${encodeURIComponent(filePath)}`
   }
 }
 

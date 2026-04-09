@@ -5,6 +5,7 @@ import {
   ensureDisplayConfigs,
   getActivePlaylist,
   getEffectiveDisplayConfig,
+  getPrimaryDisplayId,
   getPlaylistById
 } from '../../src/shared/player-config'
 import type { DisplayInfo } from '../../src/shared/types'
@@ -100,6 +101,21 @@ describe('player-config helpers', () => {
     config.activePlaylistId = 'playlist-2'
 
     expect(getActivePlaylist(config).id).toBe('playlist-2')
+  })
+
+  it('resolves the primary display id and falls back to the first display', () => {
+    expect(getPrimaryDisplayId(displays)).toBe('1')
+    expect(
+      getPrimaryDisplayId([
+        {
+          id: 'fallback',
+          label: 'Fallback Display',
+          isPrimary: false,
+          bounds: { x: 0, y: 0, width: 1280, height: 720 }
+        }
+      ])
+    ).toBe('fallback')
+    expect(getPrimaryDisplayId([])).toBeNull()
   })
 
   it('uses shared settings while the active playlist is shared across displays', () => {

@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 
 const seedMockConfig = async (page: Page, config: Record<string, unknown>) => {
@@ -32,6 +33,36 @@ test('skips broken media items and advances to the next playable item', async ({
             id: 'good',
             type: 'image',
             src: '/safe-mode.svg'
+          }
+        ]
+      }
+    ],
+    displays: {},
+    updatedAt: '2026-03-17T00:00:00.000Z'
+  })
+
+  await page.goto('/?view=player')
+
+  await expect(page.getByAltText('safe-mode.svg')).toBeVisible()
+})
+
+test('plays local image items from an absolute file path', async ({ page }) => {
+  await seedMockConfig(page, {
+    version: 1,
+    playlists: [
+      {
+        id: 'shared',
+        name: 'プレイリスト 1',
+        perDisplay: false,
+        loop: true,
+        shuffle: false,
+        defaultDurationSec: 10,
+        webTimeoutSec: 8,
+        items: [
+          {
+            id: 'local-image',
+            type: 'image',
+            src: resolve(process.cwd(), 'public/safe-mode.svg')
           }
         ]
       }

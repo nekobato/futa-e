@@ -78,6 +78,20 @@ export const ensureDisplayConfigs = (
   }
 }
 
+/**
+ * Returns the primary display, falling back to the first known display when needed.
+ */
+export const getPrimaryDisplay = (
+  displays: DisplayInfo[]
+): DisplayInfo | null =>
+  displays.find((display) => display.isPrimary) ?? displays[0] ?? null
+
+/**
+ * Returns the identifier of the primary display when one can be resolved.
+ */
+export const getPrimaryDisplayId = (displays: DisplayInfo[]): string | null =>
+  getPrimaryDisplay(displays)?.id ?? null
+
 export const getPlaylistById = (
   playlists: PlaylistConfig[] | undefined,
   playlistId: string | null | undefined

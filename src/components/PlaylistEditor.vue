@@ -4,11 +4,8 @@
       <div class="playlist-items-header">
         <div class="playlist-items-copy">
           <strong class="playlist-items-title">プレイリスト項目</strong>
-          <p class="playlist-meta">
-            {{ playlist.length }} 件を表示しています。
-            <span v-if="singleItemMode">
-              追加すると現在の項目を置き換えます。
-            </span>
+          <p v-if="singleItemMode" class="playlist-meta">
+            追加すると現在の項目を置き換えます。
           </p>
         </div>
 
@@ -28,136 +25,93 @@
         {{ emptyMessage }}
       </p>
 
-      <div v-else class="playlist-list">
-        <div
-          v-for="(item, index) in playlist"
-          :key="item.id"
-          class="playlist-item"
-        >
-          <div class="playlist-item-header">
-            <strong>{{ itemLabel(item) }}</strong>
-            <Tag :value="itemTypeLabel(item.type)" />
+      <Timeline
+        v-else
+        :value="timelineEntries"
+        data-testid="playlist-item-timeline"
+        class="playlist-list playlist-timeline"
+      >
+        <template #opposite="slotProps">
+          <div class="playlist-step">
+            <span class="playlist-step-index">
+              {{ timelineIndexLabel(slotProps.item.index) }}
+            </span>
+            <span class="playlist-step-copy">
+              {{ playbackMetaLabel(slotProps.item.item) }}
+            </span>
           </div>
+        </template>
 
-          <div class="playlist-meta">
-            {{ item.originUrl ? 'キャッシュ元: ' + item.originUrl : item.src }}
-          </div>
+        <template #marker="slotProps">
+          <span
+            class="playlist-marker"
+            :class="`is-${slotProps.item.item.type}`"
+            aria-hidden="true"
+          >
+            <i :class="itemIcon(slotProps.item.item.type)"></i>
+          </span>
+        </template>
 
-          <div v-if="showItemSettings" class="playlist-fields">
-            <div class="field-grid field-grid-2">
-              <div class="field">
-                <label :for="`playlist-duration-${item.id}`"
-                  >表示時間（秒）</label
+        <template #content="slotProps">
+          <div class="playlist-item">
+            <div class="playlist-item-header">
+              <div class="playlist-item-copy">
+                <strong>{{ itemLabel(slotProps.item.item) }}</strong>
+                <div class="playlist-meta">
+                  {{ itemSourceLabel(slotProps.item.item) }}
+                </div>
+                <div
+                  v-if="itemStateLabel(slotProps.item.item)"
+                  class="playlist-meta"
                 >
-                <InputNumber
-                  :inputId="`playlist-duration-${item.id}`"
-                  :modelValue="item.durationSec ?? null"
-                  :min="item.type === 'video' ? undefined : 2"
-                  :max="36000"
-                  placeholder="自動"
-                  @update:modelValue="
-                    updateItem(index, {
-                      durationSec: normalizeDuration(item.type, $event)
-                    })
-                  "
-                />
-              </div>
-
-              <div v-if="item.type === 'video'" class="field-inline">
-                <label :for="`playlist-mute-${item.id}`">ミュート</label>
-                <ToggleSwitch
-                  :inputId="`playlist-mute-${item.id}`"
-                  :modelValue="item.mute ?? false"
-                  @update:modelValue="
-                    updateItem(index, { mute: Boolean($event) })
-                  "
-                />
+                  {{ itemStateLabel(slotProps.item.item) }}
+                </div>
               </div>
             </div>
 
-            <template v-if="allowFallback && item.type === 'web'">
-              <div class="field-inline field-inline-toggle">
-                <div class="field-copy">
-                  <label :for="`playlist-fallback-enabled-${item.id}`"
-                    >待機・失敗時の表示</label
-                  >
-                  <p class="surface-note">
-                    Web の読込待機中または失敗時だけ、代わりの画像を表示します。
-                  </p>
-                </div>
-                <Checkbox
-                  :inputId="`playlist-fallback-enabled-${item.id}`"
-                  :modelValue="isFallbackEnabled(item.id)"
-                  binary
-                  @update:modelValue="
-                    toggleItemFallback(index, item.id, Boolean($event))
-                  "
-                />
-              </div>
-
-              <div v-if="isFallbackEnabled(item.id)" class="field-inline">
-                <div class="field-copy">
-                  <strong>フォールバック画像</strong>
-                  <p class="surface-note">
-                    {{ fallbackLabel(item.fallbackSrc) }}
-                  </p>
-                </div>
-
-                <div class="row">
-                  <Button
-                    label="画像を選択"
-                    icon="pi pi-image"
-                    severity="secondary"
-                    @click="pickItemFallback(index, item.id)"
-                  />
-                  <Button
-                    v-if="item.fallbackSrc"
-                    label="クリア"
-                    icon="pi pi-times"
-                    severity="secondary"
-                    text
-                    @click="clearItemFallback(index, item.id)"
-                  />
-                </div>
-              </div>
-            </template>
+            <div class="playlist-item-actions">
+              <Button
+                icon="pi pi-pencil"
+                text
+                severity="secondary"
+                aria-label="項目を編集"
+                @click="openEditDialog(slotProps.item.index)"
+              />
+              <Button
+                v-if="!singleItemMode"
+                icon="pi pi-arrow-up"
+                text
+                severity="secondary"
+                aria-label="項目を上へ移動"
+                :disabled="slotProps.item.index === 0"
+                @click="moveItem(slotProps.item.index, -1)"
+              />
+              <Button
+                v-if="!singleItemMode"
+                icon="pi pi-arrow-down"
+                text
+                severity="secondary"
+                aria-label="項目を下へ移動"
+                :disabled="slotProps.item.index === playlist.length - 1"
+                @click="moveItem(slotProps.item.index, 1)"
+              />
+              <Button
+                icon="pi pi-trash"
+                text
+                severity="danger"
+                aria-label="項目を削除"
+                @click="removeItem(slotProps.item.index)"
+              />
+            </div>
           </div>
-
-          <div class="playlist-item-actions">
-            <Button
-              v-if="!singleItemMode"
-              icon="pi pi-arrow-up"
-              text
-              severity="secondary"
-              aria-label="項目を上へ移動"
-              :disabled="index === 0"
-              @click="moveItem(index, -1)"
-            />
-            <Button
-              v-if="!singleItemMode"
-              icon="pi pi-arrow-down"
-              text
-              severity="secondary"
-              aria-label="項目を下へ移動"
-              :disabled="index === playlist.length - 1"
-              @click="moveItem(index, 1)"
-            />
-            <Button
-              icon="pi pi-trash"
-              text
-              severity="danger"
-              aria-label="項目を削除"
-              @click="removeItem(index)"
-            />
-          </div>
-        </div>
-      </div>
+        </template>
+      </Timeline>
     </section>
 
     <Dialog
       v-model:visible="isDraftDialogVisible"
       modal
-      header="プレイリスト項目を追加"
+      :header="dialogTitle"
       :style="{ width: '42rem' }"
       :breakpoints="{ '960px': '92vw' }"
       class="playlist-dialog"
@@ -198,6 +152,7 @@
           <InputText
             :id="urlInputId"
             v-model="urlInput"
+            size="small"
             placeholder="https://example.com/asset"
             class="w-full"
           />
@@ -213,6 +168,7 @@
             <Button
               label="ファイルを選択"
               icon="pi pi-images"
+              size="small"
               severity="secondary"
               @click="pickDraftFiles"
             />
@@ -220,6 +176,7 @@
               v-if="draftAssets.length > 0"
               label="クリア"
               icon="pi pi-times"
+              size="small"
               severity="secondary"
               text
               @click="clearDraftFiles"
@@ -232,9 +189,19 @@
           <InputNumber
             :inputId="urlDurationInputId"
             v-model="urlDuration"
+            size="small"
             :min="draftType === 'video' ? undefined : 2"
             :max="36000"
             placeholder="自動"
+          />
+        </div>
+
+        <div v-if="draftType === 'video'" class="field-inline">
+          <label :for="draftMuteInputId">ミュート</label>
+          <ToggleSwitch
+            :inputId="draftMuteInputId"
+            :modelValue="draftMute"
+            @update:modelValue="draftMute = Boolean($event)"
           />
         </div>
 
@@ -269,6 +236,7 @@
             <Button
               label="画像を選択"
               icon="pi pi-image"
+              size="small"
               severity="secondary"
               @click="pickDraftFallback"
             />
@@ -276,6 +244,7 @@
               v-if="draftFallback"
               label="クリア"
               icon="pi pi-times"
+              size="small"
               severity="secondary"
               text
               @click="clearDraftFallback"
@@ -283,7 +252,10 @@
           </div>
         </div>
 
-        <p v-if="singleItemMode" class="surface-note playlist-dialog-note">
+        <p
+          v-if="dialogMode === 'add' && singleItemMode"
+          class="surface-note playlist-dialog-note"
+        >
           決定すると現在の項目を置き換えます。
         </p>
       </div>
@@ -297,9 +269,9 @@
             @click="closeDraftDialog"
           />
           <Button
-            label="決定"
+            :label="dialogSubmitLabel"
             icon="pi pi-check"
-            :disabled="!canAddDraft"
+            :disabled="!canSubmitDraft"
             @click="submitDraft"
           />
         </div>
@@ -309,12 +281,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
+import Timeline from 'primevue/timeline'
 import { getFutaeApi } from '../shared/api'
 import type { AssetType, PickedAsset, PlaylistItem } from '../shared/types'
 import { createId, titleFromPath } from '../shared/utils'
 
 type DraftSourceMode = 'file' | 'url'
+type ItemDialogMode = 'add' | 'edit'
+type PlaylistTimelineEntry = {
+  item: PlaylistItem
+  index: number
+}
 
 const props = withDefaults(
   defineProps<{
@@ -323,13 +301,11 @@ const props = withDefaults(
     maxItems?: number
     allowFallback?: boolean
     showDraftDuration?: boolean
-    showItemSettings?: boolean
     emptyMessage?: string
   }>(),
   {
     allowFallback: true,
     showDraftDuration: true,
-    showItemSettings: true,
     emptyMessage: 'まだ項目がありません。ファイルや URL を追加してください。'
   }
 )
@@ -344,6 +320,7 @@ const api = getFutaeApi()
 const urlInputId = createId()
 const urlDurationInputId = createId()
 const draftFallbackEnabledId = createId()
+const draftMuteInputId = createId()
 const typeLabelId = createId()
 const sourceModeLabelId = createId()
 
@@ -354,7 +331,9 @@ const urlDuration = ref<number | null>(null)
 const draftAssets = ref<PickedAsset[]>([])
 const draftFallback = ref<string | null>(null)
 const draftFallbackEnabled = ref(false)
-const fallbackVisibility = ref<Record<string, boolean>>({})
+const draftMute = ref(false)
+const dialogMode = ref<ItemDialogMode>('add')
+const editingItemIndex = ref<number | null>(null)
 const isDraftDialogVisible = ref(false)
 
 const typeOptions: Array<{ label: string; value: AssetType }> = [
@@ -369,8 +348,19 @@ const sourceModeOptions: Array<{ label: string; value: DraftSourceMode }> = [
 ]
 
 const singleItemMode = computed(() => props.maxItems === 1)
+const singleDraftSelectionMode = computed(
+  () => singleItemMode.value || dialogMode.value === 'edit'
+)
+const dialogTitle = computed(() =>
+  dialogMode.value === 'edit'
+    ? 'プレイリスト項目を編集'
+    : 'プレイリスト項目を追加'
+)
+const dialogSubmitLabel = computed(() =>
+  dialogMode.value === 'edit' ? '更新' : '決定'
+)
 const fileSelectionTitle = computed(() =>
-  singleItemMode.value ? '選択中のメディア' : '追加するファイル'
+  singleDraftSelectionMode.value ? '選択中のメディア' : '追加するファイル'
 )
 const selectedAssetsLabel = computed(() => {
   if (draftAssets.value.length === 0) {
@@ -383,30 +373,36 @@ const selectedAssetsLabel = computed(() => {
 
   return `${draftAssets.value.length} 件選択中`
 })
+/** Decorates playlist items with indices for the Timeline component. */
+const timelineEntries = computed<PlaylistTimelineEntry[]>(() =>
+  props.playlist.map((item, index) => ({
+    item,
+    index
+  }))
+)
 const draftFallbackLabel = computed(() =>
   fallbackLabel(draftFallback.value ?? undefined)
 )
-const canAddDraft = computed(() =>
+const canSubmitDraft = computed(() =>
   draftSourceMode.value === 'url'
     ? urlInput.value.trim().length > 0
     : draftAssets.value.length > 0
 )
 
-const itemTypeLabel = (type: AssetType) =>
-  ({ image: '画像', video: '動画', web: 'ウェブ' })[type]
+const itemIcon = (type: AssetType) =>
+  ({ image: 'pi pi-image', video: 'pi pi-video', web: 'pi pi-globe' })[type]
 
-watch(
-  () => props.playlist,
-  (playlist) => {
-    fallbackVisibility.value = Object.fromEntries(
-      playlist.map((item) => [
-        item.id,
-        fallbackVisibility.value[item.id] ?? Boolean(item.fallbackSrc)
-      ])
-    )
-  },
-  { immediate: true, deep: true }
-)
+const timelineIndexLabel = (index: number) => String(index + 1).padStart(2, '0')
+
+const playbackMetaLabel = (item: PlaylistItem) => {
+  if (typeof item.durationSec === 'number') {
+    return `${item.durationSec} 秒`
+  }
+
+  return item.type === 'video'
+    ? '動画尺に従います'
+    : `既定 ${props.defaultDurationSec} 秒`
+}
 
 const emitPlaylist = (next: PlaylistItem[]) => {
   emit('update:playlist', next)
@@ -416,6 +412,46 @@ const emitPlaylist = (next: PlaylistItem[]) => {
 /** Opens the add-item dialog with a clean draft state. */
 const openDraftDialog = () => {
   resetDraft()
+  dialogMode.value = 'add'
+  editingItemIndex.value = null
+  isDraftDialogVisible.value = true
+}
+
+/** Opens the item dialog with the selected item's current values. */
+const openEditDialog = (index: number) => {
+  const item = props.playlist[index]
+  if (!item) {
+    return
+  }
+
+  dialogMode.value = 'edit'
+  editingItemIndex.value = index
+  draftType.value = item.type
+  urlDuration.value = item.durationSec ?? null
+  draftFallback.value = item.fallbackSrc ?? null
+  draftFallbackEnabled.value = Boolean(item.fallbackSrc)
+  draftMute.value = item.mute ?? false
+
+  if (item.type === 'web') {
+    draftSourceMode.value = 'url'
+    urlInput.value = item.src
+    draftAssets.value = []
+  } else if (item.originUrl || item.src.startsWith('http')) {
+    draftSourceMode.value = 'url'
+    urlInput.value = item.originUrl ?? item.src
+    draftAssets.value = []
+  } else {
+    draftSourceMode.value = 'file'
+    urlInput.value = ''
+    draftAssets.value = [
+      {
+        path: item.src,
+        type: item.type,
+        name: titleFromPath(item.src)
+      }
+    ]
+  }
+
   isDraftDialogVisible.value = true
 }
 
@@ -445,7 +481,7 @@ const buildItem = (asset: PickedAsset): PlaylistItem => ({
   type: asset.type,
   src: asset.path,
   durationSec: normalizeDuration(asset.type, urlDuration.value),
-  mute: false
+  mute: asset.type === 'video' ? draftMute.value : false
 })
 
 const resetDraft = () => {
@@ -454,6 +490,9 @@ const resetDraft = () => {
   draftAssets.value = []
   draftFallback.value = null
   draftFallbackEnabled.value = false
+  draftMute.value = false
+  dialogMode.value = 'add'
+  editingItemIndex.value = null
   draftSourceMode.value = draftType.value === 'web' ? 'url' : 'file'
 }
 
@@ -504,7 +543,9 @@ const pickDraftFiles = async () => {
   }
 
   const assets = await api.assets.pickFiles({ kind: draftType.value })
-  draftAssets.value = singleItemMode.value ? assets.slice(0, 1) : assets
+  draftAssets.value = singleDraftSelectionMode.value
+    ? assets.slice(0, 1)
+    : assets
 }
 
 const clearDraftFiles = () => {
@@ -534,7 +575,7 @@ const clearDraftFallback = () => {
 }
 
 const addDraft = async (): Promise<boolean> => {
-  if (!canAddDraft.value) {
+  if (!canSubmitDraft.value) {
     return false
   }
 
@@ -568,7 +609,7 @@ const addDraft = async (): Promise<boolean> => {
           draftType.value === 'web' && draftFallbackEnabled.value
             ? (draftFallback.value ?? undefined)
             : undefined,
-        mute: false
+        mute: draftType.value === 'video' ? draftMute.value : false
       }
     ])
   )
@@ -577,61 +618,97 @@ const addDraft = async (): Promise<boolean> => {
   return true
 }
 
+/** Applies the dialog values onto an existing playlist item. */
+const editDraft = async (): Promise<boolean> => {
+  if (!canSubmitDraft.value) {
+    return false
+  }
+
+  const index = editingItemIndex.value
+  if (index === null) {
+    return false
+  }
+
+  const current = props.playlist[index]
+  if (!current) {
+    return false
+  }
+
+  if (draftSourceMode.value === 'file') {
+    const asset = draftAssets.value[0]
+    if (!asset) {
+      return false
+    }
+
+    emitPlaylist(
+      props.playlist.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              id: current.id,
+              type: draftType.value,
+              src: asset.path,
+              durationSec: normalizeDuration(
+                draftType.value,
+                urlDuration.value
+              ),
+              fallbackSrc:
+                draftType.value === 'web' && draftFallbackEnabled.value
+                  ? (draftFallback.value ?? undefined)
+                  : undefined,
+              mute: draftType.value === 'video' ? draftMute.value : false
+            }
+          : item
+      )
+    )
+
+    resetDraft()
+    return true
+  }
+
+  const trimmed = urlInput.value.trim()
+  let src = trimmed
+  let originUrl: string | undefined
+
+  if (draftType.value !== 'web' && trimmed.startsWith('http')) {
+    const cached = await api.assets.cacheRemote(trimmed, draftType.value)
+    if (cached) {
+      src = cached.localPath
+      originUrl = cached.originalUrl
+    }
+  }
+
+  emitPlaylist(
+    props.playlist.map((item, itemIndex) =>
+      itemIndex === index
+        ? {
+            id: current.id,
+            type: draftType.value,
+            src,
+            originUrl,
+            durationSec: normalizeDuration(draftType.value, urlDuration.value),
+            fallbackSrc:
+              draftType.value === 'web' && draftFallbackEnabled.value
+                ? (draftFallback.value ?? undefined)
+                : undefined,
+            mute: draftType.value === 'video' ? draftMute.value : false
+          }
+        : item
+    )
+  )
+
+  resetDraft()
+  return true
+}
+
 /** Commits the draft from the dialog into the playlist and closes the dialog. */
 const submitDraft = async () => {
-  const added = await addDraft()
-  if (!added) {
+  const submitted =
+    dialogMode.value === 'edit' ? await editDraft() : await addDraft()
+  if (!submitted) {
     return
   }
 
   isDraftDialogVisible.value = false
-}
-
-const updateItem = (index: number, patch: Partial<PlaylistItem>) => {
-  const next = props.playlist.map((item, itemIndex) =>
-    itemIndex === index ? { ...item, ...patch } : item
-  )
-  emitPlaylist(next)
-}
-
-const isFallbackEnabled = (itemId: string) =>
-  fallbackVisibility.value[itemId] ?? false
-
-const toggleItemFallback = (
-  index: number,
-  itemId: string,
-  enabled: boolean
-) => {
-  fallbackVisibility.value = {
-    ...fallbackVisibility.value,
-    [itemId]: enabled
-  }
-
-  if (!enabled) {
-    updateItem(index, { fallbackSrc: undefined })
-  }
-}
-
-const pickItemFallback = async (index: number, itemId: string) => {
-  const assets = await api.assets.pickFiles({ kind: 'image' })
-  const asset = assets[0]
-  if (!asset) {
-    return
-  }
-
-  fallbackVisibility.value = {
-    ...fallbackVisibility.value,
-    [itemId]: true
-  }
-  updateItem(index, { fallbackSrc: asset.path })
-}
-
-const clearItemFallback = (index: number, itemId: string) => {
-  fallbackVisibility.value = {
-    ...fallbackVisibility.value,
-    [itemId]: false
-  }
-  updateItem(index, { fallbackSrc: undefined })
 }
 
 const assetLabel = (asset: PickedAsset) =>
@@ -639,6 +716,20 @@ const assetLabel = (asset: PickedAsset) =>
 
 const itemLabel = (item: PlaylistItem) =>
   titleFromPath(item.originUrl ?? item.src)
+
+const itemSourceLabel = (item: PlaylistItem) =>
+  item.originUrl ? `キャッシュ元: ${item.originUrl}` : item.src
+
+const itemStateLabel = (item: PlaylistItem) => {
+  const labels = [
+    item.type === 'video' && item.mute ? 'ミュート' : null,
+    item.type === 'web' && item.fallbackSrc
+      ? `フォールバック: ${fallbackLabel(item.fallbackSrc)}`
+      : null
+  ].filter((label): label is string => Boolean(label))
+
+  return labels.join(' / ')
+}
 
 const fallbackLabel = (src?: string) => (src ? titleFromPath(src) : '未選択')
 
@@ -745,37 +836,14 @@ const removeItem = (index: number) => {
     width: 100%;
   }
 
-  :where(.p-inputtext, .p-inputnumber-input) {
-    background: var(--p-form-field-background);
-    border: 1px solid var(--p-form-field-border-color);
-    color: var(--p-form-field-color);
-    min-height: 36px;
-    font-size: 14px;
-
-    &::placeholder {
-      color: var(--p-form-field-placeholder-color);
-    }
-
-    &:focus {
-      border-color: var(--focus-line);
-      box-shadow: 0 0 0 3px var(--focus-ring);
-    }
-  }
-
   :where(.p-button) {
     white-space: nowrap;
-    min-height: 34px;
-
-    &.p-button-text {
-      min-height: 30px;
-    }
   }
 }
 
 .panel-content,
 .playlist-composer,
-.playlist-items-shell,
-.playlist-fields {
+.playlist-items-shell {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -819,20 +887,61 @@ const removeItem = (index: number) => {
 }
 
 .playlist-list {
-  display: grid;
-  gap: 10px;
   max-height: 360px;
   overflow: auto;
   padding-right: 4px;
+  gap: 16px;
+}
+
+.playlist-timeline {
+  display: block;
+  width: 100%;
+
+  .p-timeline-event {
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .p-timeline-event-opposite {
+    --p-timeline-vertical-event-content-padding: 0 4px;
+
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 4px 0 20px;
+  }
+
+  .p-timeline-event-separator {
+    flex: 0 0 48px;
+    margin: 0 14px 0 0;
+  }
+
+  .p-timeline-event-marker {
+    width: auto;
+    height: auto;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .p-timeline-event-connector {
+    width: 2px;
+    background: color-mix(in srgb, var(--line-strong), var(--accent) 26%);
+  }
+
+  .p-timeline-event-content {
+    --p-timeline-vertical-event-content-padding: 0;
+
+    flex: 1 1 auto;
+    min-width: 0;
+  }
 }
 
 .playlist-item {
   display: grid;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 12px;
+  width: 100%;
   border-radius: 14px;
-  border: 1px solid var(--line-strong);
-  background: var(--panel-soft-strong);
+  background: color-mix(in srgb, var(--surface-strong), var(--panel) 16%);
 }
 
 .playlist-dialog {
@@ -864,12 +973,69 @@ const removeItem = (index: number) => {
 .playlist-item-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
 
   strong {
     min-width: 0;
     text-wrap: balance;
   }
+}
+
+.playlist-item-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.playlist-step {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  text-align: right;
+}
+
+.playlist-step-index {
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1;
+  color: color-mix(in srgb, var(--ink), var(--accent) 22%);
+}
+
+.playlist-step-copy {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.playlist-marker {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--line-strong), white 20%);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface-strong), var(--panel) 24%);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--shadow), transparent 42%);
+
+  &.is-image {
+    color: color-mix(in srgb, var(--accent), var(--ink) 16%);
+    background: color-mix(in srgb, var(--accent-soft), white 28%);
+  }
+
+  &.is-video {
+    color: color-mix(in srgb, var(--p-orange-700), var(--ink) 12%);
+    background: color-mix(in srgb, var(--accent-warm), white 32%);
+  }
+
+  &.is-web {
+    color: color-mix(in srgb, var(--p-sky-700), var(--ink) 12%);
+    background: color-mix(in srgb, var(--p-sky-100), white 22%);
+  }
+}
+
+.playlist-item-actions {
+  justify-content: flex-end;
 }
 </style>

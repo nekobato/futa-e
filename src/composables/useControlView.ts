@@ -8,6 +8,7 @@ import {
 import {
   ensureDisplayConfigs,
   getPlaylistById,
+  getPrimaryDisplayId,
   replacePlaylistById,
   replacePlaylistItemsById,
   replacePlaylistNameById,
@@ -51,6 +52,15 @@ export const useControlView = () => {
     config.value.playlists.findIndex(
       (playlist) => playlist.id === selectedPlaylist.value.id
     )
+  )
+  const enabledDisplayCount = computed(
+    () =>
+      displayInfos.value.filter(
+        (display) => config.value.displays[display.id]?.enabled !== false
+      ).length
+  )
+  const primaryDisplayId = computed(() =>
+    getPrimaryDisplayId(displayInfos.value)
   )
 
   /** Returns the effective display configuration for a display id. */
@@ -243,7 +253,25 @@ export const useControlView = () => {
     )
 
     const nextDisplays = selectedPlaylist.value.perDisplay
-      ? config.value.displays
+      ? primaryDisplayId.value
+        ? Object.fromEntries(
+            Object.entries(config.value.displays).map(
+              ([displayId, displayConfig]) => [
+                displayId,
+                displayId === primaryDisplayId.value
+                  ? {
+                      ...displayConfig,
+                      playlists: replacePlaylistItemsById(
+                        displayConfig.playlists,
+                        playlistId,
+                        playlist
+                      )
+                    }
+                  : displayConfig
+              ]
+            )
+          )
+        : config.value.displays
       : Object.fromEntries(
           Object.entries(config.value.displays).map(
             ([displayId, displayConfig]) => [
@@ -314,11 +342,24 @@ export const useControlView = () => {
   /** Toggles whether the selected playlist uses display-specific overrides. */
   const toggleSelectedPlaylistPerDisplay = (enabled: boolean) => {
     const playlistId = selectedPlaylist.value.id
-    const nextPlaylists = replacePlaylistPerDisplayById(
+    const nextPerDisplayPlaylists = replacePlaylistPerDisplayById(
       config.value.playlists,
       playlistId,
       enabled
     )
+    const nextPlaylists =
+      enabled || !primaryDisplayId.value
+        ? nextPerDisplayPlaylists
+        : replacePlaylistItemsById(
+            nextPerDisplayPlaylists,
+            playlistId,
+            cloneItems(
+              getPlaylistById(
+                getDisplayConfig(primaryDisplayId.value).playlists,
+                playlistId
+              ).items
+            )
+          )
     const nextSharedPlaylist = getPlaylistById(nextPlaylists, playlistId)
 
     const nextDisplays = Object.fromEntries(
@@ -559,6 +600,7 @@ export const useControlView = () => {
   return {
     addPlaylist,
     config,
+    enabledDisplayCount,
     displayInfos,
     duplicateSelectedPlaylist,
     isConfigReady,

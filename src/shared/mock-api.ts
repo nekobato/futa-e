@@ -18,6 +18,22 @@ const CONFIG_EVENT = 'futae:mock:config'
 let cachedScreenDetails: Promise<WindowManagementScreenDetails | null> | null =
   null
 
+/**
+ * Builds a Vite dev-server URL for a local file path during browser-mock usage.
+ */
+const toBrowserFileUrl = (filePath: string): string => {
+  if (!filePath) {
+    return filePath
+  }
+
+  const normalizedPath = filePath.replace(/\\/g, '/')
+  const viteFsPath = normalizedPath.startsWith('/')
+    ? `/@fs${normalizedPath}`
+    : `/@fs/${normalizedPath}`
+
+  return new URL(viteFsPath, window.location.origin).toString()
+}
+
 const inferAssetTypeFromFile = (file: File): AssetType | null => {
   if (file.type.startsWith('image/')) {
     return 'image'
@@ -309,7 +325,7 @@ export const createBrowserMockApi = (): FutaeApi => {
       heartbeat: () => undefined
     },
     utils: {
-      toFileUrl: (filePath: string) => filePath
+      toFileUrl: (filePath: string) => toBrowserFileUrl(filePath)
     }
   }
 }

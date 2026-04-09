@@ -77,7 +77,7 @@ import {
   nextPlayablePointer
 } from '../shared/playback'
 import type { DisplayInfo, PlayerConfig, PlaylistItem } from '../shared/types'
-import { titleFromPath } from '../shared/utils'
+import { isLikelyLocalFilePath, titleFromPath } from '../shared/utils'
 
 const api = getFutaeApi()
 const displayId = new URLSearchParams(window.location.search).get('displayId')
@@ -137,11 +137,15 @@ const resolveSource = (src: string): string => {
   if (!src) {
     return ''
   }
+  if (isLikelyLocalFilePath(src)) {
+    return api.utils.toFileUrl(src)
+  }
   if (
     src.startsWith('http') ||
     src.startsWith('blob:') ||
     src.startsWith('data:') ||
     src.startsWith('file://') ||
+    src.startsWith('futae-media://') ||
     src.startsWith('/')
   ) {
     return src

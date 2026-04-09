@@ -1,54 +1,39 @@
 <template>
   <section class="playlist-section">
     <div class="section-heading">
-      <div>
-        <p class="section-kicker">プレイリスト</p>
-        <h2>プレイリスト</h2>
-      </div>
-
-      <div class="section-copy-stack">
-        <p class="section-copy">
-          左で管理し、右で選んだプレイリストを編集いたします。再生に使う対象もここで切り替えます。
-        </p>
-        <div class="status-cluster">
-          <Tag :value="selectedPlaylistCountLabel" severity="secondary" />
-          <Tag :value="selectedPlaylist.name" severity="info" />
-        </div>
-      </div>
+      <h2>プレイリスト</h2>
     </div>
 
-    <Splitter class="playlist-workbench">
-      <SplitterPanel :size="28" :minSize="22">
-        <aside class="playlist-pane">
+    <div class="playlist-workbench">
+      <aside class="playlist-pane">
+        <div class="playlist-pane-card">
           <div class="playlist-pane-header">
-            <div>
-              <h3>一覧</h3>
-              <p class="surface-note">
-                {{ playlistCatalogCountLabel }}
-              </p>
-            </div>
+            <h3>一覧</h3>
 
-            <div class="row">
+            <div class="row playlist-pane-actions">
               <Button
-                label="追加"
                 icon="pi pi-plus"
                 size="small"
+                text
+                severity="secondary"
+                aria-label="プレイリストを追加"
                 data-testid="playlist-add-button"
                 @click="emit('add-playlist')"
               />
               <Button
-                label="複製"
                 icon="pi pi-copy"
                 size="small"
+                text
                 severity="secondary"
+                aria-label="プレイリストを複製"
                 @click="emit('duplicate-selected-playlist')"
               />
               <Button
-                label="削除"
                 icon="pi pi-trash"
                 size="small"
                 severity="danger"
                 text
+                aria-label="プレイリストを削除"
                 :disabled="!canRemoveSelectedPlaylist"
                 @click="emit('remove-selected-playlist')"
               />
@@ -86,20 +71,12 @@
               </div>
             </button>
           </div>
-        </aside>
-      </SplitterPanel>
+        </div>
+      </aside>
 
-      <SplitterPanel :size="72" :minSize="52">
-        <section class="playlist-detail">
+      <section class="playlist-detail">
+        <div class="playlist-detail-card">
           <div class="playlist-detail-bar">
-            <div class="playlist-detail-status">
-              <strong class="playlist-detail-title">{{
-                selectedPlaylist.name
-              }}</strong>
-              <span class="surface-note">{{
-                selectedPlaylistStatusMessage
-              }}</span>
-            </div>
             <div class="playlist-detail-actions">
               <Tag
                 v-if="isSelectedPlaylistActive"
@@ -110,11 +87,14 @@
                 v-else
                 label="再生対象にする"
                 icon="pi pi-check"
+                size="small"
                 severity="secondary"
+                :disabled="!canSetSelectedPlaylistActive"
                 @click="emit('set-active-playlist', selectedPlaylist.id)"
               />
               <Button
                 icon="pi pi-arrow-up"
+                size="small"
                 text
                 severity="secondary"
                 aria-label="プレイリストを上へ移動"
@@ -123,6 +103,7 @@
               />
               <Button
                 icon="pi pi-arrow-down"
+                size="small"
                 text
                 severity="secondary"
                 aria-label="プレイリストを下へ移動"
@@ -133,102 +114,125 @@
           </div>
 
           <div class="playlist-detail-body">
-            <div class="field-grid field-grid-2">
-              <div class="field">
-                <label :for="playlistNameInputId">プレイリスト名</label>
-                <InputText
-                  :id="playlistNameInputId"
-                  :modelValue="selectedPlaylist.name"
-                  class="w-full"
-                  @update:modelValue="
-                    emit('rename-selected-playlist', String($event ?? ''))
-                  "
-                />
+            <div class="playlist-settings">
+              <div class="playlist-setting-row">
+                <label :for="playlistNameInputId" class="playlist-setting-label"
+                  >プレイリスト名</label
+                >
+                <div class="playlist-setting-control">
+                  <InputText
+                    :id="playlistNameInputId"
+                    :modelValue="selectedPlaylist.name"
+                    size="small"
+                    class="w-full"
+                    @update:modelValue="
+                      emit('rename-selected-playlist', String($event ?? ''))
+                    "
+                  />
+                </div>
               </div>
 
               <div
-                class="field-inline field-inline-toggle"
+                class="playlist-setting-row"
                 data-testid="per-display-controls"
               >
-                <div class="field-copy">
-                  <label :for="perDisplayInputId"
-                    >モニター個別に内容を分ける</label
-                  >
-                  <p class="surface-note">
-                    ON
-                    にすると、このプレイリストだけディスプレイごとの差分を編集できます。
-                  </p>
+                <label :for="perDisplayInputId" class="playlist-setting-label"
+                  >モニターを分ける</label
+                >
+                <div
+                  class="playlist-setting-control playlist-setting-control-toggle"
+                >
+                  <ToggleSwitch
+                    :inputId="perDisplayInputId"
+                    :modelValue="selectedPlaylist.perDisplay"
+                    @update:modelValue="
+                      emit(
+                        'toggle-selected-playlist-per-display',
+                        Boolean($event)
+                      )
+                    "
+                  />
                 </div>
-                <ToggleSwitch
-                  :inputId="perDisplayInputId"
-                  :modelValue="selectedPlaylist.perDisplay"
-                  @update:modelValue="
-                    emit(
-                      'toggle-selected-playlist-per-display',
-                      Boolean($event)
-                    )
-                  "
-                />
-              </div>
-            </div>
-
-            <div class="field-grid field-grid-2">
-              <div class="field-inline">
-                <label :for="playlistLoopInputId">ループ再生</label>
-                <ToggleSwitch
-                  :inputId="playlistLoopInputId"
-                  :modelValue="selectedPlaylist.loop"
-                  @update:modelValue="
-                    emit('update-selected-playlist-settings', {
-                      loop: Boolean($event)
-                    })
-                  "
-                />
               </div>
 
-              <div class="field-inline">
-                <label :for="playlistShuffleInputId">シャッフル</label>
-                <ToggleSwitch
-                  :inputId="playlistShuffleInputId"
-                  :modelValue="selectedPlaylist.shuffle"
-                  @update:modelValue="
-                    emit('update-selected-playlist-settings', {
-                      shuffle: Boolean($event)
-                    })
-                  "
-                />
-              </div>
-            </div>
-
-            <div class="field-grid field-grid-2">
-              <div class="field">
-                <label :for="playlistDefaultDurationInputId"
-                  >既定表示時間（秒）</label
+              <div class="playlist-setting-row">
+                <label :for="playlistLoopInputId" class="playlist-setting-label"
+                  >ループ再生</label
                 >
-                <InputNumber
-                  :inputId="playlistDefaultDurationInputId"
-                  :modelValue="selectedPlaylist.defaultDurationSec"
-                  :min="2"
-                  :max="36000"
-                  @update:modelValue="
-                    emit('update-selected-playlist-default-duration', $event)
-                  "
-                />
+                <div
+                  class="playlist-setting-control playlist-setting-control-toggle"
+                >
+                  <ToggleSwitch
+                    :inputId="playlistLoopInputId"
+                    :modelValue="selectedPlaylist.loop"
+                    @update:modelValue="
+                      emit('update-selected-playlist-settings', {
+                        loop: Boolean($event)
+                      })
+                    "
+                  />
+                </div>
               </div>
 
-              <div class="field">
-                <label :for="playlistWebTimeoutInputId"
-                  >Web 読込待機時間（秒）</label
+              <div class="playlist-setting-row">
+                <label
+                  :for="playlistShuffleInputId"
+                  class="playlist-setting-label"
+                  >シャッフル</label
                 >
-                <InputNumber
-                  :inputId="playlistWebTimeoutInputId"
-                  :modelValue="selectedPlaylist.webTimeoutSec"
-                  :min="2"
-                  :max="120"
-                  @update:modelValue="
-                    emit('update-selected-playlist-web-timeout', $event)
-                  "
-                />
+                <div
+                  class="playlist-setting-control playlist-setting-control-toggle"
+                >
+                  <ToggleSwitch
+                    :inputId="playlistShuffleInputId"
+                    :modelValue="selectedPlaylist.shuffle"
+                    @update:modelValue="
+                      emit('update-selected-playlist-settings', {
+                        shuffle: Boolean($event)
+                      })
+                    "
+                  />
+                </div>
+              </div>
+
+              <div class="playlist-setting-row">
+                <label
+                  :for="playlistDefaultDurationInputId"
+                  class="playlist-setting-label"
+                  >表示時間（秒）</label
+                >
+                <div class="playlist-setting-control">
+                  <InputNumber
+                    :inputId="playlistDefaultDurationInputId"
+                    :modelValue="selectedPlaylist.defaultDurationSec"
+                    size="small"
+                    :min="2"
+                    :max="36000"
+                    @update:modelValue="
+                      emit('update-selected-playlist-default-duration', $event)
+                    "
+                  />
+                </div>
+              </div>
+
+              <div class="playlist-setting-row">
+                <label
+                  :for="playlistWebTimeoutInputId"
+                  class="playlist-setting-label"
+                  >読込待機時間（秒）</label
+                >
+                <div class="playlist-setting-control">
+                  <InputNumber
+                    :inputId="playlistWebTimeoutInputId"
+                    :modelValue="selectedPlaylist.webTimeoutSec"
+                    size="small"
+                    :min="2"
+                    :max="120"
+                    @update:modelValue="
+                      emit('update-selected-playlist-web-timeout', $event)
+                    "
+                  />
+                </div>
               </div>
             </div>
 
@@ -238,9 +242,9 @@
                 @update:value="emit('update-selected-playlist-scope', $event)"
               >
                 <TabList>
-                  <Tab value="shared">共通</Tab>
+                  <Tab value="shared">{{ primaryDisplayTabLabel }}</Tab>
                   <Tab
-                    v-for="display in displayInfos"
+                    v-for="display in secondaryDisplays"
                     :key="display.id"
                     :value="display.id"
                   >
@@ -251,10 +255,6 @@
                 <TabPanels>
                   <TabPanel value="shared">
                     <div class="playlist-editor-shell">
-                      <p class="surface-note">
-                        個別設定を持つ前の基準内容です。新しいディスプレイを検出した際の初期値にもなります。
-                      </p>
-
                       <PlaylistEditor
                         :playlist="selectedPlaylist.items"
                         :default-duration-sec="
@@ -268,7 +268,7 @@
                   </TabPanel>
 
                   <TabPanel
-                    v-for="display in displayInfos"
+                    v-for="display in secondaryDisplays"
                     :key="display.id"
                     :value="display.id"
                   >
@@ -339,16 +339,16 @@
               />
             </div>
           </div>
-        </section>
-      </SplitterPanel>
-    </Splitter>
+        </div>
+      </section>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import PlaylistEditor from '../PlaylistEditor.vue'
-import { getPlaylistById } from '../../shared/player-config'
+import { getPlaylistById, getPrimaryDisplay } from '../../shared/player-config'
 import type {
   DisplayInfo,
   PlayerConfig,
@@ -401,19 +401,26 @@ const playlistShuffleInputId = 'control-playlist-shuffle'
 const playlistDefaultDurationInputId = 'control-playlist-default-duration'
 const playlistWebTimeoutInputId = 'control-playlist-web-timeout'
 
-const selectedPlaylistCountLabel = computed(
-  () => `${props.config.playlists.length} 件を保持`
-)
-const playlistCatalogCountLabel = computed(
-  () => `${props.config.playlists.length} 件を保持しています。`
-)
 const isSelectedPlaylistActive = computed(
   () => props.selectedPlaylist.id === props.config.activePlaylistId
 )
-const selectedPlaylistStatusMessage = computed(() =>
-  isSelectedPlaylistActive.value
-    ? 'このプレイリストが現在の再生対象です。'
-    : 'このプレイリストは保存されますが、現在は再生対象ではありません。'
+const hasSelectedPlaylistItems = computed(() => {
+  if (props.selectedPlaylist.items.length > 0) {
+    return true
+  }
+
+  if (!props.selectedPlaylist.perDisplay) {
+    return false
+  }
+
+  return Object.values(props.config.displays).some(
+    (displayConfig) =>
+      getPlaylistById(displayConfig.playlists, props.selectedPlaylist.id).items
+        .length > 0
+  )
+})
+const canSetSelectedPlaylistActive = computed(
+  () => hasSelectedPlaylistItems.value
 )
 const canRemoveSelectedPlaylist = computed(
   () => props.config.playlists.length > 1
@@ -423,6 +430,15 @@ const canMoveSelectedPlaylistUp = computed(
 )
 const canMoveSelectedPlaylistDown = computed(
   () => props.selectedPlaylistIndex < props.config.playlists.length - 1
+)
+const primaryDisplay = computed(() => getPrimaryDisplay(props.displayInfos))
+const primaryDisplayTabLabel = computed(
+  () => primaryDisplay.value?.label ?? '共通'
+)
+const secondaryDisplays = computed(() =>
+  props.displayInfos.filter(
+    (display) => display.id !== primaryDisplay.value?.id
+  )
 )
 
 /** Builds a stable input id for display-specific editor toggles. */
@@ -444,48 +460,16 @@ const displayPlaylist = (displayId: string) =>
 <style lang="scss">
 .playlist-section {
   display: grid;
-  gap: 16px;
-  padding: 20px 22px;
-  border-radius: 22px;
-  background: var(--panel);
-  border: 1px solid var(--line-subtle);
-  box-shadow: var(--shadow);
-
-  :where(.p-button) {
-    white-space: nowrap;
-    min-height: 34px;
-
-    &.p-button-text {
-      min-height: 30px;
-    }
-  }
-
-  :where(.p-inputtext, .p-inputnumber-input) {
-    background: var(--p-form-field-background);
-    border: 1px solid var(--p-form-field-border-color);
-    color: var(--p-form-field-color);
-    min-height: 36px;
-    font-size: 14px;
-
-    &::placeholder {
-      color: var(--p-form-field-placeholder-color);
-    }
-
-    &:focus {
-      border-color: var(--focus-line);
-      box-shadow: 0 0 0 3px var(--focus-ring);
-    }
-  }
+  gap: 18px;
 
   .surface-note {
     font-size: 12.5px;
     color: var(--muted);
-    line-height: 1.5;
+    line-height: 1.6;
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
   }
 
-  .status-cluster,
   .row,
   .display-summary-actions,
   .playlist-detail-actions {
@@ -496,66 +480,50 @@ const displayPlaylist = (displayId: string) =>
   }
 
   .section-heading {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(240px, 420px);
-    gap: 16px;
-    align-items: start;
-    padding-bottom: 4px;
-    border-bottom: 1px solid var(--line-subtle);
-
     h2 {
       margin: 0;
-      font-size: 16px;
+      font-family: var(--font-display);
+      font-size: clamp(28px, 3vw, 36px);
+      line-height: 0.95;
       font-weight: 700;
+      letter-spacing: 0.01em;
       text-wrap: balance;
       color: var(--ink);
     }
   }
 
-  .section-kicker {
-    margin: 0 0 6px;
-    color: var(--accent);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-
-  .section-copy {
-    margin: 0;
-    color: var(--muted);
-    line-height: 1.55;
-  }
-
-  .section-copy-stack {
-    display: grid;
-    gap: 10px;
-    justify-items: end;
-  }
-
-  .field-grid {
+  .playlist-settings {
     display: grid;
     gap: 14px;
-
-    &-2 {
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    }
   }
 
-  .field {
+  .playlist-setting-row {
     display: grid;
-    gap: 8px;
+    grid-template-columns: minmax(120px, 156px) minmax(0, 1fr);
+    align-items: center;
+    gap: 12px 16px;
+  }
 
-    label {
-      font-weight: 600;
-      letter-spacing: 0.01em;
-    }
+  .playlist-setting-label {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .playlist-setting-control {
+    min-width: 0;
+    width: 100%;
+    max-width: 360px;
+    justify-self: stretch;
 
     :where(.p-inputnumber, .p-select, .p-inputtext),
     .p-inputnumber-input,
     .p-select-label {
       width: 100%;
     }
+  }
+
+  .playlist-setting-control-toggle {
+    width: auto;
   }
 
   .field-inline {
@@ -581,7 +549,7 @@ const displayPlaylist = (displayId: string) =>
     &-compact {
       gap: 8px;
       padding: 7px 10px;
-      border-radius: 10px;
+      border-radius: 999px;
       background: var(--panel-soft-strong);
     }
 
@@ -607,32 +575,31 @@ const displayPlaylist = (displayId: string) =>
   }
 
   .playlist-workbench {
-    min-height: clamp(520px, 60vh, 680px);
-    border: 1px solid var(--line-strong);
-    border-radius: 18px;
-    overflow: hidden;
-    background: var(--panel-soft);
-
-    :where(.p-splitter-gutter) {
-      background: color-mix(in srgb, var(--line-strong), transparent 30%);
-    }
-
-    :where(.p-splitterpanel) {
-      min-width: 0;
-    }
+    display: grid;
+    grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+    gap: 16px;
+    min-height: clamp(560px, 62vh, 760px);
   }
 
   .playlist-pane,
   .playlist-detail {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
+    min-width: 0;
+    display: grid;
+    gap: 0;
+    align-content: start;
   }
 
-  .playlist-pane {
-    padding: 16px;
-    gap: 14px;
-    background: var(--panel-soft-strong);
+  .playlist-pane-card,
+  .playlist-detail-card {
+    min-width: 0;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 18px;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--line-strong);
+    background: color-mix(in srgb, var(--surface-strong), var(--panel) 12%);
   }
 
   .playlist-pane-header,
@@ -647,10 +614,14 @@ const displayPlaylist = (displayId: string) =>
   .playlist-pane-header {
     h3 {
       margin: 0;
-      font-size: 20px;
-      font-weight: 700;
+      font-size: 18px;
+      font-weight: 600;
       color: var(--ink);
     }
+  }
+
+  .playlist-pane-actions {
+    justify-content: flex-end;
   }
 
   .playlist-catalog {
@@ -663,9 +634,9 @@ const displayPlaylist = (displayId: string) =>
   .playlist-summary {
     appearance: none;
     border: 1px solid var(--line-strong);
-    background: color-mix(in srgb, var(--p-surface-0), transparent 8%);
-    border-radius: 14px;
-    padding: 12px 14px;
+    background: color-mix(in srgb, var(--surface-strong), var(--panel) 20%);
+    border-radius: 12px;
+    padding: 12px 13px;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
@@ -684,10 +655,10 @@ const displayPlaylist = (displayId: string) =>
     }
 
     &.is-selected {
-      border-color: color-mix(in srgb, var(--accent), transparent 38%);
-      background: var(--panel-soft-emphasis);
+      border-color: color-mix(in srgb, var(--accent), transparent 28%);
+      background: color-mix(in srgb, var(--accent-soft), white 56%);
       box-shadow: inset 0 0 0 1px
-        color-mix(in srgb, var(--accent), transparent 82%);
+        color-mix(in srgb, var(--accent), transparent 78%);
     }
   }
 
@@ -708,31 +679,10 @@ const displayPlaylist = (displayId: string) =>
     justify-items: end;
   }
 
-  .playlist-detail {
-    padding: 18px;
-    gap: 16px;
-    background: color-mix(in srgb, var(--p-surface-0), transparent 10%);
-  }
-
   .playlist-detail-bar {
-    padding-bottom: 4px;
+    justify-content: flex-end;
+    padding-bottom: 12px;
     border-bottom: 1px solid var(--line-subtle);
-  }
-
-  .playlist-detail-status {
-    display: grid;
-    gap: 6px;
-    min-width: 0;
-    flex: 1 1 280px;
-  }
-
-  .playlist-detail-title {
-    font-size: 24px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
-    color: var(--ink);
-    text-wrap: balance;
   }
 
   .playlist-detail-actions {
@@ -745,7 +695,7 @@ const displayPlaylist = (displayId: string) =>
     flex: 1;
     min-height: 0;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
   }
 
   .playlist-tab-shell,
@@ -758,7 +708,7 @@ const displayPlaylist = (displayId: string) =>
     display: flex;
     flex-direction: column;
     gap: 14px;
-    padding: 12px 0 0;
+    padding: 4px 0 0;
   }
 
   .playlist-tab-shell {
@@ -769,13 +719,14 @@ const displayPlaylist = (displayId: string) =>
     }
 
     :where(.p-tablist) {
-      gap: 4px;
-      border-bottom: 1px solid var(--line-strong);
+      gap: 6px;
+      border-bottom: 1px solid var(--line-subtle);
     }
 
     :where(.p-tab) {
-      padding-inline: 16px;
+      padding-inline: 14px;
       color: var(--muted);
+      border-radius: 999px 999px 0 0;
     }
 
     :where(.p-tab-active) {
@@ -798,14 +749,38 @@ const displayPlaylist = (displayId: string) =>
   }
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 900px) {
   .playlist-section {
-    .section-heading {
+    .playlist-workbench {
+      grid-template-columns: minmax(220px, 248px) minmax(0, 1fr);
+      gap: 14px;
+    }
+
+    .playlist-pane-card,
+    .playlist-detail-card {
+      padding: 16px;
+    }
+
+    .playlist-setting-row {
+      grid-template-columns: minmax(104px, 132px) minmax(0, 1fr);
+      gap: 10px 12px;
+    }
+  }
+}
+
+@media (max-width: 720px) {
+  .playlist-section {
+    .playlist-workbench {
       grid-template-columns: 1fr;
     }
 
-    .section-copy-stack {
-      justify-items: start;
+    .playlist-setting-row {
+      grid-template-columns: 1fr;
+      align-items: start;
+    }
+
+    .playlist-setting-control {
+      max-width: none;
     }
   }
 }

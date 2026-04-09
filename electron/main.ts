@@ -1,6 +1,14 @@
-import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  net,
+  protocol,
+  screen
+} from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { dirname, extname, join } from 'node:path'
+import { dirname, extname, isAbsolute, join } from 'node:path'
 import { promises as fs } from 'node:fs'
 import type {
   AssetType,
@@ -30,6 +38,18 @@ import { applyPlayerWindowPresentation } from './player-window'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
+const LOCAL_MEDIA_SCHEME = 'futae-media'
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: LOCAL_MEDIA_SCHEME,
+    privileges: {
+      secure: true,
+      standard: true,
+      supportFetchAPI: true
+    }
+  }
+])
 
 let controlWindow: BrowserWindow | null = null
 let playerWindows: BrowserWindow[] = []
@@ -39,6 +59,43 @@ const heartbeatMap = new Map<number, number>()
 let heartbeatInterval: NodeJS.Timeout | null = null
 
 const getPreloadPath = () => join(__dirname, 'preload.js')
+
+/**
+ * Decodes a local-media protocol request into an absolute file path.
+ */
+const decodeLocalMediaPath = (requestUrl: string): string | null => {
+  const { host, pathname } = new URL(requestUrl)
+  if (host !== 'local' || pathname.length <= 1) {
+    return null
+  }
+
+  const filePath = decodeURIComponent(pathname.slice(1))
+  return isAbsolute(filePath) ? filePath : null
+}
+
+/**
+ * Registers the protocol handler used to stream local media files in Electron.
+ */
+const registerLocalMediaProtocol = () => {
+  if (protocol.isProtocolHandled(LOCAL_MEDIA_SCHEME)) {
+    return
+  }
+
+  protocol.handle(LOCAL_MEDIA_SCHEME, (request) => {
+    const filePath = decodeLocalMediaPath(request.url)
+
+    if (!filePath) {
+      return new Response('Invalid local media request.', {
+        status: 400,
+        headers: {
+          'content-type': 'text/plain; charset=utf-8'
+        }
+      })
+    }
+
+    return net.fetch(pathToFileURL(filePath).toString())
+  })
+}
 
 const getRendererUrl = (
   view: string,
@@ -201,10 +258,10 @@ const listDisplays = (): DisplayInfo[] => {
 
 const createControlWindow = () => {
   controlWindow = createWindow('control', {
-    width: 1200,
-    height: 800,
-    minWidth: 980,
-    minHeight: 720,
+    width: 800,
+    height: 600,
+    minWidth: 800,
+    minHeight: 600,
     title: 'Futa-e'
   })
 
@@ -242,7 +299,8 @@ const createPlayerWindows = () => {
         minimizable: false,
         maximizable: false,
         backgroundColor: '#000000',
-        alwaysOnTop: true
+        alwaysOnTop: true,
+        roundedCorners: false
       },
       {
         displayId: String(display.id)
@@ -340,6 +398,7 @@ const updateConfig = async (next: PlayerConfig): Promise<PlayerConfig> => {
 }
 
 app.whenReady().then(async () => {
+  registerLocalMediaProtocol()
   editableConfig = await loadConfig()
   playbackConfig = await loadPlaybackConfig()
 
