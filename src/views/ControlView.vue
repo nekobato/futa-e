@@ -12,44 +12,38 @@
       />
     </header>
 
-    <div v-if="isConfigReady" class="control-canvas">
-      <main class="settings-main">
-        <DisplaySettingsPanel
-          :display-infos="displayInfos"
-          :displays="config.displays"
-          @toggle-display="setDisplayEnabled"
-        />
+    <main v-if="isConfigReady" class="settings-main">
+      <DisplaySettingsPanel
+        :display-infos="displayInfos"
+        :displays="config.displays"
+        @toggle-display="setDisplayEnabled"
+      />
 
-        <PlaylistWorkbenchSection
-          :config="config"
-          :display-infos="displayInfos"
-          :selected-playlist="selectedPlaylist"
-          :selected-playlist-index="selectedPlaylistIndex"
-          :selected-playlist-scope="selectedPlaylistScope"
-          @add-playlist="addPlaylist"
-          @duplicate-selected-playlist="duplicateSelectedPlaylist"
-          @move-selected-playlist="moveSelectedPlaylist"
-          @remove-selected-playlist="removeSelectedPlaylist"
-          @rename-selected-playlist="renameSelectedPlaylist"
-          @select-playlist="selectPlaylist"
-          @set-active-playlist="setActivePlaylist"
-          @set-display-enabled="setDisplayEnabled"
-          @toggle-selected-playlist-per-display="
-            toggleSelectedPlaylistPerDisplay
-          "
-          @update-selected-display-playlist="updateSelectedDisplayPlaylist"
-          @update-selected-playlist-default-duration="
-            updateSelectedPlaylistDefaultDuration
-          "
-          @update-selected-playlist-scope="updateSelectedPlaylistScope"
-          @update-selected-playlist-settings="updateSelectedPlaylistSettings"
-          @update-selected-playlist-web-timeout="
-            updateSelectedPlaylistWebTimeout
-          "
-          @update-selected-shared-playlist="updateSelectedSharedPlaylist"
-        />
-      </main>
-    </div>
+      <PlaylistWorkbenchSection
+        :config="config"
+        :display-infos="displayInfos"
+        :selected-playlist="selectedPlaylist"
+        :selected-playlist-index="selectedPlaylistIndex"
+        :selected-playlist-scope="selectedPlaylistScope"
+        @add-playlist="addPlaylist"
+        @duplicate-selected-playlist="duplicateSelectedPlaylist"
+        @move-selected-playlist="moveSelectedPlaylist"
+        @remove-selected-playlist="removeSelectedPlaylist"
+        @rename-selected-playlist="renameSelectedPlaylist"
+        @select-playlist="selectPlaylist"
+        @set-active-playlist="setActivePlaylist"
+        @set-display-enabled="setDisplayEnabled"
+        @toggle-selected-playlist-per-display="toggleSelectedPlaylistPerDisplay"
+        @update-selected-display-playlist="updateSelectedDisplayPlaylist"
+        @update-selected-playlist-default-duration="
+          updateSelectedPlaylistDefaultDuration
+        "
+        @update-selected-playlist-scope="updateSelectedPlaylistScope"
+        @update-selected-playlist-settings="updateSelectedPlaylistSettings"
+        @update-selected-playlist-web-timeout="updateSelectedPlaylistWebTimeout"
+        @update-selected-shared-playlist="updateSelectedSharedPlaylist"
+      />
+    </main>
 
     <div v-else class="control-surface control-surface-loading">
       <p class="surface-note">設定を読み込んでおります。</p>
@@ -143,20 +137,6 @@ const handleStartPlayer = async () => {
       font-weight: 700;
       letter-spacing: 0.01em;
     }
-  }
-
-  .control-canvas {
-    display: grid;
-    gap: 24px;
-    padding: 24px 26px 28px;
-    border-radius: 30px;
-    border: 1px solid var(--line-strong);
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--panel), white 52%),
-      color-mix(in srgb, var(--panel), white 34%)
-    );
-    box-shadow: var(--shadow);
   }
 
   .settings-main {

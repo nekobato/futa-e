@@ -1,7 +1,7 @@
 <template>
   <section class="playlist-section">
     <div class="section-heading">
-      <h2>プレイリスト</h2>
+      <h2>Playlists</h2>
     </div>
 
     <div class="playlist-workbench">
@@ -460,7 +460,7 @@ const displayPlaylist = (displayId: string) =>
 <style lang="scss">
 .playlist-section {
   display: grid;
-  gap: 18px;
+  gap: 0;
 
   .surface-note {
     font-size: 12.5px;
@@ -480,11 +480,16 @@ const displayPlaylist = (displayId: string) =>
   }
 
   .section-heading {
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    padding-left: 16px;
+
     h2 {
       margin: 0;
       font-family: var(--font-display);
-      font-size: clamp(28px, 3vw, 36px);
-      line-height: 0.95;
+      font-size: 16px;
+      line-height: 1;
       font-weight: 700;
       letter-spacing: 0.01em;
       text-wrap: balance;

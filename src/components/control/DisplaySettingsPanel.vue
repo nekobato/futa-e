@@ -1,43 +1,45 @@
 <template>
   <section class="display-settings">
     <header class="display-settings-header">
-      <h2>接続ディスプレイ</h2>
+      <h2>Displays</h2>
     </header>
 
     <div v-if="displayInfos.length > 0" class="display-list">
-      <article
-        v-for="display in displayInfos"
-        :key="display.id"
-        class="display-summary"
-      >
-        <div class="display-icon" aria-hidden="true">
-          <i class="pi pi-desktop"></i>
-        </div>
-
-        <div class="display-copy">
-          <strong>{{ display.label }}</strong>
-          <span class="surface-note">
-            {{ display.bounds.width }} x {{ display.bounds.height }}
-          </span>
-        </div>
-
-        <div class="display-summary-actions">
-          <Tag
-            :value="display.isPrimary ? 'メイン' : '画面'"
-            severity="secondary"
-          />
-          <div class="display-toggle">
-            <label :for="displayEnabledInputId(display.id)">有効</label>
-            <ToggleSwitch
-              :inputId="displayEnabledInputId(display.id)"
-              :modelValue="isDisplayEnabled(display.id)"
-              @update:modelValue="
-                emit('toggle-display', display.id, Boolean($event))
-              "
-            />
+      <div class="display-track">
+        <article
+          v-for="display in displayInfos"
+          :key="display.id"
+          class="display-summary"
+        >
+          <div class="display-icon" aria-hidden="true">
+            <i class="pi pi-desktop"></i>
           </div>
-        </div>
-      </article>
+
+          <div class="display-copy">
+            <strong>{{ display.label }}</strong>
+            <span class="surface-note">
+              {{ display.bounds.width }} x {{ display.bounds.height }}
+            </span>
+          </div>
+
+          <div class="display-summary-actions">
+            <Tag
+              :value="display.isPrimary ? 'メイン' : '画面'"
+              severity="secondary"
+            />
+            <div class="display-toggle">
+              <label :for="displayEnabledInputId(display.id)">有効</label>
+              <ToggleSwitch
+                :inputId="displayEnabledInputId(display.id)"
+                :modelValue="isDisplayEnabled(display.id)"
+                @update:modelValue="
+                  emit('toggle-display', display.id, Boolean($event))
+                "
+              />
+            </div>
+          </div>
+        </article>
+      </div>
     </div>
 
     <p v-else class="surface-note">ディスプレイはまだ検出できておりません。</p>
@@ -68,21 +70,22 @@ const isDisplayEnabled = (displayId: string) =>
 <style lang="scss">
 .display-settings {
   display: grid;
-  gap: 18px;
-  padding: 8px 10px 0;
-  justify-items: center;
+  gap: 12px;
+  padding: 8px 0 0;
+  justify-items: stretch;
 
   &-header {
-    display: grid;
-    gap: 0;
-    justify-items: center;
-    text-align: center;
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    padding-left: 16px;
+    text-align: left;
 
     h2 {
       margin: 0;
       font-family: var(--font-display);
-      font-size: clamp(30px, 3vw, 42px);
-      line-height: 0.95;
+      font-size: 16px;
+      line-height: 1;
       font-weight: 700;
       letter-spacing: 0.01em;
       color: var(--ink);
@@ -100,21 +103,32 @@ const isDisplayEnabled = (displayId: string) =>
 
   .display-list {
     width: 100%;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 14px;
+    padding: 20px 24px;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--line-strong);
+    background: color-mix(in srgb, var(--surface-strong), var(--panel) 10%);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-gutter: stable;
+  }
+
+  .display-track {
+    width: max-content;
+    min-width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    gap: 24px;
   }
 
   .display-summary {
+    flex: 0 0 220px;
     display: grid;
     justify-items: center;
     align-content: start;
     gap: 12px;
     min-height: 160px;
-    padding: 18px 18px 16px;
-    border-radius: var(--radius-card);
-    border: 1px solid var(--line-strong);
-    background: color-mix(in srgb, var(--surface-strong), var(--panel) 10%);
+    padding: 0;
   }
 
   .display-copy {

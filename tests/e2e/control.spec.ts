@@ -39,9 +39,7 @@ test('shows per-display editors when individual monitor settings are enabled', a
 
   await expect(page.getByRole('heading', { name: 'Futa E' })).toBeVisible()
   await expect(page.getByRole('button', { name: '開始' })).toBeVisible()
-  await expect(
-    page.getByRole('heading', { name: 'プレイリスト' })
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Playlists' })).toBeVisible()
   await expect(page.getByText('Built-in Display')).toBeVisible()
   await expect(page.getByText('Studio Display')).toBeVisible()
   await expect(page.getByTestId('playlist-list-item')).toHaveCount(1)
