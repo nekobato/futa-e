@@ -191,4 +191,25 @@ describe('player-config helpers', () => {
 
     expect(countEnabledDisplays(config, displays)).toBe(1)
   })
+
+  it('counts only enabled displays even when the active playlist is shared', () => {
+    const config = ensureDisplayConfigs(createDefaultConfig(), displays)
+    config.playlists = [
+      {
+        id: 'playlist-1',
+        name: 'プレイリスト 1',
+        perDisplay: false,
+        loop: true,
+        shuffle: false,
+        defaultDurationSec: 10,
+        webTimeoutSec: 8,
+        items: []
+      }
+    ]
+    config.activePlaylistId = 'playlist-1'
+    config.displays = ensureDisplayConfigs(config, displays).displays
+    config.displays['2'].enabled = false
+
+    expect(countEnabledDisplays(config, displays)).toBe(1)
+  })
 })

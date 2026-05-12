@@ -1,24 +1,22 @@
 import type { FutaeApi } from './ipc'
-import { createBrowserMockApi } from './mock-api'
 
 let cachedApi: FutaeApi | null = null
 
-/** Returns true when the renderer is hosted by Electron but preload injection failed. */
-const isElectronShell = (): boolean =>
-  window.location.protocol === 'file:' ||
-  window.navigator.userAgent.includes('Electron/')
+/** Returns the Electron preload bridge or fails when it is unavailable. */
+const requirePreloadApi = (): FutaeApi => {
+  if (!window.futae) {
+    throw new Error('Futa-e preload bridge was not injected.')
+  }
 
+  return window.futae
+}
+
+/** Returns the application API exposed by the Electron preload bridge. */
 export const getFutaeApi = (): FutaeApi => {
   if (cachedApi) {
     return cachedApi
   }
 
-  if (!window.futae && isElectronShell()) {
-    console.warn(
-      'Futa-e preload bridge was not injected. Falling back to the browser mock API.'
-    )
-  }
-
-  cachedApi = window.futae ?? createBrowserMockApi()
+  cachedApi = requirePreloadApi()
   return cachedApi
 }

@@ -186,15 +186,18 @@ export const replacePlaylistSettingsById = (
     ...settings
   }))
 
+/**
+ * Filters the provided displays down to playback targets that remain enabled.
+ */
+export const filterEnabledDisplays = <T extends { id: string | number }>(
+  config: PlayerConfig,
+  displays: T[]
+): T[] =>
+  displays.filter(
+    (display) => config.displays[String(display.id)]?.enabled !== false
+  )
+
 export const countEnabledDisplays = (
   config: PlayerConfig,
   displays: DisplayInfo[]
-): number => {
-  if (!isPerDisplayPlaylist(getActivePlaylist(config))) {
-    return displays.length
-  }
-
-  return displays.filter(
-    (display) => config.displays[display.id]?.enabled !== false
-  ).length
-}
+): number => filterEnabledDisplays(config, displays).length

@@ -201,7 +201,7 @@
           <ToggleSwitch
             :inputId="draftMuteInputId"
             :modelValue="draftMute"
-            @update:modelValue="draftMute = Boolean($event)"
+            @change="draftMute = toggleSwitchChecked($event)"
           />
         </div>
 
@@ -373,6 +373,11 @@ const selectedAssetsLabel = computed(() => {
 
   return `${draftAssets.value.length} 件選択中`
 })
+
+/** Reads the checked state from a PrimeVue toggle change event. */
+const toggleSwitchChecked = (event: Event): boolean =>
+  Boolean((event.target as HTMLInputElement | null)?.checked)
+
 /** Decorates playlist items with indices for the Timeline component. */
 const timelineEntries = computed<PlaylistTimelineEntry[]>(() =>
   props.playlist.map((item, index) => ({

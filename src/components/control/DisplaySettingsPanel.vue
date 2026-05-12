@@ -32,8 +32,12 @@
               <ToggleSwitch
                 :inputId="displayEnabledInputId(display.id)"
                 :modelValue="isDisplayEnabled(display.id)"
-                @update:modelValue="
-                  emit('toggle-display', display.id, Boolean($event))
+                @change="
+                  emit(
+                    'toggle-display',
+                    display.id,
+                    toggleSwitchChecked($event)
+                  )
                 "
               />
             </div>
@@ -65,12 +69,15 @@ const displayEnabledInputId = (displayId: string) =>
 /** Resolves the current enabled state for a display. */
 const isDisplayEnabled = (displayId: string) =>
   props.displays[displayId]?.enabled ?? true
+
+/** Reads the checked state from a PrimeVue toggle change event. */
+const toggleSwitchChecked = (event: Event): boolean =>
+  Boolean((event.target as HTMLInputElement | null)?.checked)
 </script>
 
 <style lang="scss">
 .display-settings {
   display: grid;
-  gap: 12px;
   padding: 8px 0 0;
   justify-items: stretch;
 
@@ -117,41 +124,47 @@ const isDisplayEnabled = (displayId: string) =>
     min-width: 100%;
     display: flex;
     justify-content: center;
-    align-items: stretch;
+    align-items: center;
     gap: 24px;
   }
 
   .display-summary {
-    flex: 0 0 220px;
+    flex: 0 0 18cap;
     display: grid;
     justify-items: center;
     align-content: start;
-    gap: 12px;
-    min-height: 160px;
+    gap: 8px;
     padding: 0;
   }
 
   .display-copy {
+    width: 100%;
     display: grid;
     gap: 4px;
     min-width: 0;
     text-align: center;
 
+    > * {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     strong {
       font-size: 16px;
       font-weight: 600;
-      min-width: 0;
-      text-wrap: balance;
     }
   }
 
   .display-icon {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     display: grid;
     place-items: center;
     border-radius: 999px;
-    border: 1px solid var(--line-strong);
     background: color-mix(in srgb, var(--surface-strong), white 45%);
     font-size: 18px;
     color: color-mix(in srgb, var(--ink), var(--accent) 22%);

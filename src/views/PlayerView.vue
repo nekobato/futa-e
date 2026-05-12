@@ -60,6 +60,8 @@
         </p>
       </div>
     </div>
+
+    <div class="player-cursor-shield" aria-hidden="true"></div>
   </div>
 </template>
 
@@ -384,6 +386,12 @@ onBeforeUnmount(() => {
   background: #0b0b0b;
   position: relative;
   overflow: hidden;
+  cursor: none;
+}
+
+.player-stage,
+.player-stage * {
+  cursor: none !important;
 }
 
 .player-media {
@@ -416,5 +424,12 @@ onBeforeUnmount(() => {
     width: min(420px, 60vw);
     margin-bottom: 20px;
   }
+}
+
+.player-cursor-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  cursor: none;
 }
 </style>

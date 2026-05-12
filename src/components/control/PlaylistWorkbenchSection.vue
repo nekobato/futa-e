@@ -145,10 +145,10 @@
                   <ToggleSwitch
                     :inputId="perDisplayInputId"
                     :modelValue="selectedPlaylist.perDisplay"
-                    @update:modelValue="
+                    @change="
                       emit(
                         'toggle-selected-playlist-per-display',
-                        Boolean($event)
+                        toggleSwitchChecked($event)
                       )
                     "
                   />
@@ -165,9 +165,9 @@
                   <ToggleSwitch
                     :inputId="playlistLoopInputId"
                     :modelValue="selectedPlaylist.loop"
-                    @update:modelValue="
+                    @change="
                       emit('update-selected-playlist-settings', {
-                        loop: Boolean($event)
+                        loop: toggleSwitchChecked($event)
                       })
                     "
                   />
@@ -186,9 +186,9 @@
                   <ToggleSwitch
                     :inputId="playlistShuffleInputId"
                     :modelValue="selectedPlaylist.shuffle"
-                    @update:modelValue="
+                    @change="
                       emit('update-selected-playlist-settings', {
-                        shuffle: Boolean($event)
+                        shuffle: toggleSwitchChecked($event)
                       })
                     "
                   />
@@ -298,11 +298,11 @@
                             <ToggleSwitch
                               :inputId="displayEditorEnabledInputId(display.id)"
                               :modelValue="isDisplayEnabled(display.id)"
-                              @update:modelValue="
+                              @change="
                                 emit(
                                   'set-display-enabled',
                                   display.id,
-                                  Boolean($event)
+                                  toggleSwitchChecked($event)
                                 )
                               "
                             />
@@ -448,6 +448,10 @@ const displayEditorEnabledInputId = (displayId: string) =>
 /** Resolves the current enabled state for a display override. */
 const isDisplayEnabled = (displayId: string) =>
   props.config.displays[displayId]?.enabled ?? true
+
+/** Reads the checked state from a PrimeVue toggle change event. */
+const toggleSwitchChecked = (event: Event): boolean =>
+  Boolean((event.target as HTMLInputElement | null)?.checked)
 
 /** Returns the playlist shown for a specific display tab. */
 const displayPlaylist = (displayId: string) =>

@@ -1,5 +1,38 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createBrowserMockApi } from '../../src/shared/mock-api'
+import { createDefaultConfig } from '../../src/shared/defaults'
+import type { FutaeApi } from '../../src/shared/ipc'
+
+/** Creates a minimal preload API double for API selection tests. */
+const createPreloadApi = (): FutaeApi => ({
+  config: {
+    get: async () => createDefaultConfig(),
+    getDiagnostics: async () => ({
+      backend: 'electron-store',
+      configExists: false,
+      configPath: null
+    }),
+    getPlayback: async () => createDefaultConfig(),
+    save: async (next) => next,
+    onUpdated: () => () => undefined
+  },
+  assets: {
+    pickFiles: async () => [],
+    cacheRemote: async () => null
+  },
+  displays: {
+    list: async () => [],
+    onChanged: () => () => undefined
+  },
+  player: {
+    start: async () => ({ running: true, displayCount: 0 }),
+    stop: async () => ({ running: false, displayCount: 0 }),
+    status: async () => ({ running: false, displayCount: 0 }),
+    heartbeat: () => undefined
+  },
+  utils: {
+    toFileUrl: (filePath) => `file://${filePath}`
+  }
+})
 
 describe('shared api selection', () => {
   beforeEach(() => {
@@ -9,7 +42,7 @@ describe('shared api selection', () => {
   })
 
   it('prefers the preload bridge when Electron injects the API', async () => {
-    const bridgedApi = createBrowserMockApi()
+    const bridgedApi = createPreloadApi()
     window.futae = bridgedApi
 
     const { getFutaeApi } = await import('../../src/shared/api')
@@ -17,22 +50,11 @@ describe('shared api selection', () => {
     expect(getFutaeApi()).toBe(bridgedApi)
   })
 
-  it('warns and exposes the browser mock backend when the preload bridge is missing', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(
-      'Mozilla/5.0 Electron/39.0.0'
-    )
-
+  it('fails when the preload bridge is missing', async () => {
     const { getFutaeApi } = await import('../../src/shared/api')
-    const api = getFutaeApi()
 
-    await expect(api.config.getDiagnostics()).resolves.toEqual({
-      backend: 'browser-mock',
-      configExists: false,
-      configPath: null
-    })
-    expect(warn).toHaveBeenCalledWith(
-      'Futa-e preload bridge was not injected. Falling back to the browser mock API.'
+    expect(() => getFutaeApi()).toThrow(
+      'Futa-e preload bridge was not injected.'
     )
   })
 })

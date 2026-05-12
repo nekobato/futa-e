@@ -3,13 +3,14 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  nativeImage,
   net,
   protocol,
   screen
 } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, extname, isAbsolute, join } from 'node:path'
-import { promises as fs } from 'node:fs'
+import { existsSync, promises as fs } from 'node:fs'
 import type {
   AssetType,
   CacheResult,
@@ -19,10 +20,7 @@ import type {
   PlayerStatus
 } from '../src/shared/types'
 import { coerceConfig, createDefaultConfig } from '../src/shared/defaults'
-import {
-  getActivePlaylist,
-  isPerDisplayPlaylist
-} from '../src/shared/player-config'
+import { filterEnabledDisplays } from '../src/shared/player-config'
 import {
   dialogExtensionsForKind,
   toPickedAssetFromPath
@@ -59,6 +57,28 @@ const heartbeatMap = new Map<number, number>()
 let heartbeatInterval: NodeJS.Timeout | null = null
 
 const getPreloadPath = () => join(__dirname, 'preload.js')
+
+/** Returns the project-local PNG used for Electron window and dock icons. */
+const getAppIconPath = () => join(app.getAppPath(), 'resources', 'app-icon.png')
+
+/** Loads the application icon when the generated asset is available. */
+const getAppIcon = (): Electron.NativeImage | undefined => {
+  const iconPath = getAppIconPath()
+  if (!existsSync(iconPath)) {
+    return undefined
+  }
+
+  const icon = nativeImage.createFromPath(iconPath)
+  return icon.isEmpty() ? undefined : icon
+}
+
+/** Applies the generated icon to macOS Dock where window icons are ignored. */
+const applyDockIcon = () => {
+  const icon = getAppIcon()
+  if (process.platform === 'darwin' && icon) {
+    app.dock?.setIcon(icon)
+  }
+}
 
 /**
  * Decodes a local-media protocol request into an absolute file path.
@@ -227,7 +247,9 @@ const createWindow = (
   options: Electron.BrowserWindowConstructorOptions,
   params: Record<string, string> = {}
 ) => {
+  const icon = getAppIcon()
   const win = new BrowserWindow({
+    ...(icon ? { icon } : {}),
     ...options,
     webPreferences: {
       preload: getPreloadPath(),
@@ -271,15 +293,10 @@ const createControlWindow = () => {
 }
 
 const createPlayerWindows = () => {
-  const activePlaylist = getActivePlaylist(playbackConfig)
-  const displays = isPerDisplayPlaylist(activePlaylist)
-    ? screen
-        .getAllDisplays()
-        .filter(
-          (display) =>
-            playbackConfig.displays[String(display.id)]?.enabled !== false
-        )
-    : screen.getAllDisplays()
+  const displays = filterEnabledDisplays(
+    playbackConfig,
+    screen.getAllDisplays()
+  )
 
   playerWindows = displays.map((display) => {
     const win = createWindow(
@@ -398,6 +415,7 @@ const updateConfig = async (next: PlayerConfig): Promise<PlayerConfig> => {
 }
 
 app.whenReady().then(async () => {
+  applyDockIcon()
   registerLocalMediaProtocol()
   editableConfig = await loadConfig()
   playbackConfig = await loadPlaybackConfig()
@@ -453,6 +471,7 @@ ipcMain.handle('displays:list', async () => listDisplays())
 
 ipcMain.handle('player:start', async () => {
   if (playerWindows.length === 0) {
+    playbackConfig = await loadPlaybackConfig()
     console.log('Starting player windows...')
     createPlayerWindows()
     broadcastConfig(playbackConfig)

@@ -1,6 +1,6 @@
 {
   "name": "futa-e",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "private": true,
   "packageManager": "pnpm@9.15.0",
   "engines": {
@@ -19,9 +19,7 @@
     "typecheck": "pnpm run tsc && pnpm run vue-tsc",
     "lint": "pnpm run typecheck && pnpm run format:check",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "qa": "playwright test",
-    "qa:install": "playwright install chromium"
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@primeuix/themes": "^2.0.2",
@@ -31,7 +29,6 @@
     "vue": "^3.5.26"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
     "@types/node": "^25.0.5",
     "@vitejs/plugin-vue": "^6.0.3",
     "electron": "^39.2.7",

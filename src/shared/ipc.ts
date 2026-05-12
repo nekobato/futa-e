@@ -12,7 +12,7 @@ export type AssetPickOptions = {
 }
 
 export type ConfigDiagnostics = {
-  backend: 'electron-store' | 'browser-mock'
+  backend: 'electron-store'
   configExists: boolean
   configPath: string | null
 }
