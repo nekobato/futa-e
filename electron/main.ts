@@ -36,7 +36,10 @@ import { applyPlayerWindowPresentation } from './player-window'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
+const APP_NAME = 'Futa E'
 const LOCAL_MEDIA_SCHEME = 'futae-media'
+
+app.setName(APP_NAME)
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -284,7 +287,7 @@ const createControlWindow = () => {
     height: 600,
     minWidth: 800,
     minHeight: 600,
-    title: 'Futa-e'
+    title: APP_NAME
   })
 
   controlWindow.on('closed', () => {

@@ -11,6 +11,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "package": "pnpm run package:mac",
+    "package:mac": "pnpm run build && pnpm dlx electron-builder@26.8.1 --mac zip --arm64 --config electron-builder.config.cjs --publish never",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

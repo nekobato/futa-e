@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { coerceConfig } from '../../src/shared/defaults'
+import {
+  coerceConfig,
+  createDefaultPlaylistName
+} from '../../src/shared/defaults'
 
 describe('config coercion', () => {
+  it('builds stable fallback playlist names from a zero-based index', () => {
+    expect(createDefaultPlaylistName(0)).toBe('プレイリスト 1')
+    expect(createDefaultPlaylistName(2)).toBe('プレイリスト 3')
+    expect(createDefaultPlaylistName(-1)).toBe('プレイリスト 1')
+    expect(createDefaultPlaylistName(Number.NaN)).toBe('プレイリスト 1')
+  })
+
   it('uses the saved active playlist when it exists', () => {
     const config = coerceConfig({
       version: 1,

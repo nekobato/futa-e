@@ -193,6 +193,7 @@
             :min="draftType === 'video' ? undefined : 2"
             :max="36000"
             placeholder="自動"
+            @blur="commitDraftDuration"
           />
         </div>
 
@@ -479,6 +480,15 @@ const normalizeDuration = (
   }
 
   return type === 'video' ? undefined : props.defaultDurationSec
+}
+
+/** Fills an empty image/web duration after the input loses focus. */
+const commitDraftDuration = () => {
+  if (draftType.value === 'video' || urlDuration.value !== null) {
+    return
+  }
+
+  urlDuration.value = props.defaultDurationSec
 }
 
 const buildItem = (asset: PickedAsset): PlaylistItem => ({

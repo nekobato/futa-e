@@ -122,12 +122,12 @@
                 <div class="playlist-setting-control">
                   <InputText
                     :id="playlistNameInputId"
-                    :modelValue="selectedPlaylist.name"
+                    :modelValue="playlistNameDraft"
                     size="small"
                     class="w-full"
-                    @update:modelValue="
-                      emit('rename-selected-playlist', String($event ?? ''))
-                    "
+                    @focus="focusDraftInput('playlistName')"
+                    @update:modelValue="updatePlaylistNameDraft"
+                    @blur="commitPlaylistNameDraft"
                   />
                 </div>
               </div>
@@ -204,13 +204,13 @@
                 <div class="playlist-setting-control">
                   <InputNumber
                     :inputId="playlistDefaultDurationInputId"
-                    :modelValue="selectedPlaylist.defaultDurationSec"
+                    :modelValue="playlistDefaultDurationDraft"
                     size="small"
-                    :min="2"
-                    :max="36000"
-                    @update:modelValue="
-                      emit('update-selected-playlist-default-duration', $event)
-                    "
+                    :min="PLAYLIST_DURATION_MIN"
+                    :max="PLAYLIST_DURATION_MAX"
+                    @focus="focusDraftInput('defaultDuration')"
+                    @update:modelValue="updatePlaylistDefaultDurationDraft"
+                    @blur="commitPlaylistDefaultDurationDraft"
                   />
                 </div>
               </div>
@@ -224,13 +224,13 @@
                 <div class="playlist-setting-control">
                   <InputNumber
                     :inputId="playlistWebTimeoutInputId"
-                    :modelValue="selectedPlaylist.webTimeoutSec"
+                    :modelValue="playlistWebTimeoutDraft"
                     size="small"
-                    :min="2"
-                    :max="120"
-                    @update:modelValue="
-                      emit('update-selected-playlist-web-timeout', $event)
-                    "
+                    :min="PLAYLIST_WEB_TIMEOUT_MIN"
+                    :max="PLAYLIST_WEB_TIMEOUT_MAX"
+                    @focus="focusDraftInput('webTimeout')"
+                    @update:modelValue="updatePlaylistWebTimeoutDraft"
+                    @blur="commitPlaylistWebTimeoutDraft"
                   />
                 </div>
               </div>
@@ -346,8 +346,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import PlaylistEditor from '../PlaylistEditor.vue'
+import {
+  createDefaultPlaylistName,
+  DEFAULT_PLAYLIST_DURATION_SEC,
+  DEFAULT_PLAYLIST_WEB_TIMEOUT_SEC
+} from '../../shared/defaults'
 import { getPlaylistById, getPrimaryDisplay } from '../../shared/player-config'
 import type {
   DisplayInfo,
@@ -355,6 +360,7 @@ import type {
   PlaylistConfig,
   PlaylistItem
 } from '../../shared/types'
+import { clampNumber } from '../../shared/utils'
 
 type PlaylistSettingsPatch = Partial<
   Pick<
@@ -400,6 +406,22 @@ const playlistLoopInputId = 'control-playlist-loop'
 const playlistShuffleInputId = 'control-playlist-shuffle'
 const playlistDefaultDurationInputId = 'control-playlist-default-duration'
 const playlistWebTimeoutInputId = 'control-playlist-web-timeout'
+const PLAYLIST_DURATION_MIN = 2
+const PLAYLIST_DURATION_MAX = 36000
+const PLAYLIST_WEB_TIMEOUT_MIN = 2
+const PLAYLIST_WEB_TIMEOUT_MAX = 120
+
+type NumericInputValue = number | null | undefined
+type DraftInputName = 'playlistName' | 'defaultDuration' | 'webTimeout'
+
+const focusedDraftInput = ref<DraftInputName | null>(null)
+const playlistNameDraft = ref(props.selectedPlaylist.name)
+const playlistDefaultDurationDraft = ref<NumericInputValue>(
+  props.selectedPlaylist.defaultDurationSec
+)
+const playlistWebTimeoutDraft = ref<NumericInputValue>(
+  props.selectedPlaylist.webTimeoutSec
+)
 
 const isSelectedPlaylistActive = computed(
   () => props.selectedPlaylist.id === props.config.activePlaylistId
@@ -440,6 +462,132 @@ const secondaryDisplays = computed(() =>
     (display) => display.id !== primaryDisplay.value?.id
   )
 )
+
+watch(
+  () =>
+    [
+      props.selectedPlaylist.id,
+      props.selectedPlaylist.name,
+      props.selectedPlaylist.defaultDurationSec,
+      props.selectedPlaylist.webTimeoutSec
+    ] as const,
+  ([, name, defaultDurationSec, webTimeoutSec]) => {
+    if (focusedDraftInput.value !== 'playlistName') {
+      playlistNameDraft.value = name
+    }
+
+    if (focusedDraftInput.value !== 'defaultDuration') {
+      playlistDefaultDurationDraft.value = defaultDurationSec
+    }
+
+    if (focusedDraftInput.value !== 'webTimeout') {
+      playlistWebTimeoutDraft.value = webTimeoutSec
+    }
+  }
+)
+
+/** Marks an input draft as actively edited so external saves cannot overwrite it. */
+const focusDraftInput = (inputName: DraftInputName) => {
+  focusedDraftInput.value = inputName
+}
+
+/** Clears the active draft marker after the matching input has committed. */
+const clearFocusedDraftInput = (inputName: DraftInputName) => {
+  if (focusedDraftInput.value === inputName) {
+    focusedDraftInput.value = null
+  }
+}
+
+/** Checks whether an input draft carries a usable finite number. */
+const isFiniteNumberDraft = (value: NumericInputValue): value is number =>
+  typeof value === 'number' && Number.isFinite(value)
+
+/** Resolves a numeric draft to its defaulted and clamped committed value. */
+const resolveNumericDraft = (
+  value: NumericInputValue,
+  fallback: number,
+  min: number,
+  max: number
+): number =>
+  clampNumber(isFiniteNumberDraft(value) ? value : fallback, min, max)
+
+/** Updates the playlist name draft without committing blank text. */
+const updatePlaylistNameDraft = (value: string | undefined) => {
+  const name = value ?? ''
+  playlistNameDraft.value = name
+
+  if (name.trim().length > 0) {
+    emit('rename-selected-playlist', name)
+  }
+}
+
+/** Commits the playlist name, defaulting only after the input loses focus. */
+const commitPlaylistNameDraft = () => {
+  const name = playlistNameDraft.value
+  const committedName =
+    name.trim().length > 0
+      ? name
+      : createDefaultPlaylistName(props.selectedPlaylistIndex)
+
+  playlistNameDraft.value = committedName
+  clearFocusedDraftInput('playlistName')
+
+  if (committedName !== props.selectedPlaylist.name) {
+    emit('rename-selected-playlist', committedName)
+  }
+}
+
+/** Updates the default duration draft while preserving the empty input state. */
+const updatePlaylistDefaultDurationDraft = (value: NumericInputValue) => {
+  playlistDefaultDurationDraft.value = value
+
+  if (isFiniteNumberDraft(value)) {
+    emit('update-selected-playlist-default-duration', value)
+  }
+}
+
+/** Commits the default duration, filling blank input with the configured default. */
+const commitPlaylistDefaultDurationDraft = () => {
+  const value = resolveNumericDraft(
+    playlistDefaultDurationDraft.value,
+    DEFAULT_PLAYLIST_DURATION_SEC,
+    PLAYLIST_DURATION_MIN,
+    PLAYLIST_DURATION_MAX
+  )
+
+  playlistDefaultDurationDraft.value = value
+  clearFocusedDraftInput('defaultDuration')
+
+  if (value !== props.selectedPlaylist.defaultDurationSec) {
+    emit('update-selected-playlist-default-duration', value)
+  }
+}
+
+/** Updates the web timeout draft while preserving the empty input state. */
+const updatePlaylistWebTimeoutDraft = (value: NumericInputValue) => {
+  playlistWebTimeoutDraft.value = value
+
+  if (isFiniteNumberDraft(value)) {
+    emit('update-selected-playlist-web-timeout', value)
+  }
+}
+
+/** Commits the web timeout, filling blank input with the configured default. */
+const commitPlaylistWebTimeoutDraft = () => {
+  const value = resolveNumericDraft(
+    playlistWebTimeoutDraft.value,
+    DEFAULT_PLAYLIST_WEB_TIMEOUT_SEC,
+    PLAYLIST_WEB_TIMEOUT_MIN,
+    PLAYLIST_WEB_TIMEOUT_MAX
+  )
+
+  playlistWebTimeoutDraft.value = value
+  clearFocusedDraftInput('webTimeout')
+
+  if (value !== props.selectedPlaylist.webTimeoutSec) {
+    emit('update-selected-playlist-web-timeout', value)
+  }
+}
 
 /** Builds a stable input id for display-specific editor toggles. */
 const displayEditorEnabledInputId = (displayId: string) =>

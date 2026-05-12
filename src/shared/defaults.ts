@@ -7,12 +7,20 @@ import type {
 } from './types'
 import { clampNumber, createId, isRecord } from './utils'
 
-const DEFAULT_PLAYLIST_NAME = 'プレイリスト 1'
-const LEGACY_OVERLAY_PLAYLIST_NAME = 'プレイリスト 2'
+/**
+ * Builds the fallback playlist label used when a name is left blank.
+ */
+export const createDefaultPlaylistName = (index = 0): string =>
+  `プレイリスト ${
+    (Number.isFinite(index) ? Math.max(0, Math.floor(index)) : 0) + 1
+  }`
+
+const DEFAULT_PLAYLIST_NAME = createDefaultPlaylistName()
+const LEGACY_OVERLAY_PLAYLIST_NAME = createDefaultPlaylistName(1)
 const DEFAULT_PLAYLIST_LOOP = true
 const DEFAULT_PLAYLIST_SHUFFLE = false
-const DEFAULT_PLAYLIST_DURATION_SEC = 10
-const DEFAULT_PLAYLIST_WEB_TIMEOUT_SEC = 8
+export const DEFAULT_PLAYLIST_DURATION_SEC = 10
+export const DEFAULT_PLAYLIST_WEB_TIMEOUT_SEC = 8
 
 type PlaylistPlaybackDefaults = Pick<
   PlaylistConfig,
@@ -181,7 +189,7 @@ const normalizePlaylists = (
     .map((playlist, index) =>
       normalizePlaylistConfig(
         playlist,
-        `プレイリスト ${index + 1}`,
+        createDefaultPlaylistName(index),
         fallback[index]?.perDisplay ?? false,
         {
           loop: fallback[index]?.loop ?? legacyPlaybackDefaults.loop,
