@@ -1,7 +1,7 @@
 const { version } = require('./package.json')
 
 module.exports = {
-  appId: 'com.nekobato.futa-e',
+  appId: 'net.netkobato.futa-e',
   productName: 'Futa E',
   artifactName: `Futa-e-v${version}-darwin-arm64.${'${ext}'}`,
   asar: true,
@@ -10,6 +10,10 @@ module.exports = {
   directories: {
     output: 'output/electron-builder',
     buildResources: 'resources'
+  },
+  protocols: {
+    name: 'Futa E',
+    schemes: ['futa-e']
   },
   files: ['dist/**/*', 'dist-electron/**/*', 'resources/**/*', 'package.json'],
   mac: {

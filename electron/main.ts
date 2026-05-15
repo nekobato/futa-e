@@ -3,10 +3,12 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  Menu,
   nativeImage,
   net,
   protocol,
-  screen
+  screen,
+  Tray
 } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, extname, isAbsolute, join } from 'node:path'
@@ -33,6 +35,12 @@ import {
 } from './config'
 import { shouldExitPlayerWindows } from './player-window-input'
 import { applyPlayerWindowPresentation } from './player-window'
+import {
+  DEEP_LINK_SCHEME,
+  findDeepLinkArg,
+  parseDeepLink,
+  type DeepLinkCommand
+} from './deep-link'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -40,6 +48,10 @@ const APP_NAME = 'Futa E'
 const LOCAL_MEDIA_SCHEME = 'futae-media'
 
 app.setName(APP_NAME)
+const hasSingleInstanceLock = app.requestSingleInstanceLock()
+if (!hasSingleInstanceLock) {
+  app.quit()
+}
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -54,15 +66,22 @@ protocol.registerSchemesAsPrivileged([
 
 let controlWindow: BrowserWindow | null = null
 let playerWindows: BrowserWindow[] = []
+let statusTray: Tray | null = null
 let editableConfig: PlayerConfig = createDefaultConfig()
 let playbackConfig: PlayerConfig = createDefaultConfig()
 const heartbeatMap = new Map<number, number>()
 let heartbeatInterval: NodeJS.Timeout | null = null
+let deepLinksReady = false
+const queuedDeepLinkCommands: DeepLinkCommand[] = []
 
 const getPreloadPath = () => join(__dirname, 'preload.js')
 
 /** Returns the project-local PNG used for Electron window and dock icons. */
 const getAppIconPath = () => join(app.getAppPath(), 'resources', 'app-icon.png')
+
+/** Returns the project-local PNG used for the macOS menu bar template icon. */
+const getTrayIconPath = () =>
+  join(app.getAppPath(), 'resources', 'tray-iconTemplate.png')
 
 /** Loads the application icon when the generated asset is available. */
 const getAppIcon = (): Electron.NativeImage | undefined => {
@@ -75,11 +94,37 @@ const getAppIcon = (): Electron.NativeImage | undefined => {
   return icon.isEmpty() ? undefined : icon
 }
 
+/** Loads the menu bar icon and marks it as a macOS template image. */
+const getTrayIcon = (): Electron.NativeImage | undefined => {
+  const trayIconPath = getTrayIconPath()
+  if (!existsSync(trayIconPath)) {
+    return getAppIcon()
+  }
+
+  const icon = nativeImage.createFromPath(trayIconPath)
+  if (icon.isEmpty()) {
+    return getAppIcon()
+  }
+
+  if (process.platform === 'darwin') {
+    icon.setTemplateImage(true)
+  }
+
+  return icon
+}
+
 /** Applies the generated icon to macOS Dock where window icons are ignored. */
 const applyDockIcon = () => {
   const icon = getAppIcon()
   if (process.platform === 'darwin' && icon) {
     app.dock?.setIcon(icon)
+  }
+}
+
+/** Registers the packaged app as the handler for futa-e:// deep links. */
+const registerDeepLinkProtocol = () => {
+  if (app.isPackaged) {
+    app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME)
   }
 }
 
@@ -333,6 +378,7 @@ const createPlayerWindows = () => {
       if (playerWindows.length === 0) {
         stopHeartbeatMonitor()
       }
+      updateStatusTrayMenu()
     })
 
     win.webContents.on('render-process-gone', () => {
@@ -376,6 +422,7 @@ const closePlayerWindows = () => {
   playerWindows.forEach((win) => win.close())
   playerWindows = []
   stopHeartbeatMonitor()
+  updateStatusTrayMenu()
 }
 
 const restoreControlWindow = () => {
@@ -403,6 +450,113 @@ const getStatus = (): PlayerStatus => ({
   displayCount: playerWindows.length
 })
 
+/** Starts player windows if kiosk mode is not already running. */
+const startPlayerMode = async (): Promise<PlayerStatus> => {
+  if (playerWindows.length === 0) {
+    playbackConfig = await loadPlaybackConfig()
+    console.log('Starting player windows...')
+    createPlayerWindows()
+    broadcastConfig(playbackConfig)
+    updateStatusTrayMenu()
+  }
+
+  return getStatus()
+}
+
+/** Refreshes the menu bar status menu from the current player state. */
+const updateStatusTrayMenu = () => {
+  if (!statusTray) {
+    return
+  }
+
+  const isRunning = playerWindows.length > 0
+  statusTray.setToolTip(
+    isRunning
+      ? `${APP_NAME} - Kiosk running on ${playerWindows.length} display(s)`
+      : `${APP_NAME} - Kiosk ready`
+  )
+  statusTray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: isRunning ? 'Kioskを停止' : 'Kioskを開始',
+        click: () => {
+          if (isRunning) {
+            exitPlayerMode()
+            return
+          }
+
+          void startPlayerMode()
+        }
+      },
+      {
+        label: '操作画面を表示',
+        click: restoreControlWindow
+      },
+      { type: 'separator' },
+      {
+        label: 'Futa Eを終了',
+        role: 'quit'
+      }
+    ])
+  )
+}
+
+/** Creates the macOS menu bar entry for quick kiosk control. */
+const createStatusTray = () => {
+  if (statusTray) {
+    return
+  }
+
+  const icon = getTrayIcon()
+  if (!icon || icon.isEmpty()) {
+    return
+  }
+
+  statusTray = new Tray(icon)
+  updateStatusTrayMenu()
+}
+
+/** Runs an already parsed deep-link command against the current app state. */
+const runDeepLinkCommand = async (command: DeepLinkCommand) => {
+  if (command === 'start-player') {
+    await startPlayerMode()
+    return
+  }
+  if (command === 'stop-player') {
+    exitPlayerMode()
+    return
+  }
+
+  restoreControlWindow()
+}
+
+/** Queues deep-link commands until the app has loaded configuration. */
+const dispatchDeepLinkCommand = (command: DeepLinkCommand) => {
+  if (!deepLinksReady) {
+    queuedDeepLinkCommands.push(command)
+    return
+  }
+
+  void runDeepLinkCommand(command)
+}
+
+/** Parses and dispatches a raw futa-e:// URL. */
+const handleDeepLinkUrl = (rawUrl: string) => {
+  const command = parseDeepLink(rawUrl)
+  if (!command) {
+    return
+  }
+
+  dispatchDeepLinkCommand(command)
+}
+
+/** Replays deep links captured before Electron finished initialization. */
+const flushQueuedDeepLinkCommands = () => {
+  const commands = [...queuedDeepLinkCommands]
+  queuedDeepLinkCommands.length = 0
+  commands.forEach(dispatchDeepLinkCommand)
+}
+
 const updateConfig = async (next: PlayerConfig): Promise<PlayerConfig> => {
   const normalized = coerceConfig(next)
   editableConfig = await saveConfig(normalized)
@@ -417,18 +571,44 @@ const updateConfig = async (next: PlayerConfig): Promise<PlayerConfig> => {
   return editableConfig
 }
 
-app.whenReady().then(async () => {
-  applyDockIcon()
-  registerLocalMediaProtocol()
-  editableConfig = await loadConfig()
-  playbackConfig = await loadPlaybackConfig()
-
-  createControlWindow()
-
-  screen.on('display-added', broadcastDisplays)
-  screen.on('display-removed', broadcastDisplays)
-  screen.on('display-metrics-changed', broadcastDisplays)
+app.on('open-url', (event, rawUrl) => {
+  event.preventDefault()
+  handleDeepLinkUrl(rawUrl)
 })
+
+if (hasSingleInstanceLock) {
+  app.on('second-instance', (_event, commandLine) => {
+    const rawUrl = findDeepLinkArg(commandLine)
+    if (rawUrl) {
+      handleDeepLinkUrl(rawUrl)
+      return
+    }
+
+    restoreControlWindow()
+  })
+
+  app.whenReady().then(async () => {
+    applyDockIcon()
+    registerLocalMediaProtocol()
+    registerDeepLinkProtocol()
+    editableConfig = await loadConfig()
+    playbackConfig = await loadPlaybackConfig()
+
+    createControlWindow()
+    createStatusTray()
+    deepLinksReady = true
+
+    const initialDeepLink = findDeepLinkArg(process.argv)
+    if (initialDeepLink) {
+      handleDeepLinkUrl(initialDeepLink)
+    }
+    flushQueuedDeepLinkCommands()
+
+    screen.on('display-added', broadcastDisplays)
+    screen.on('display-removed', broadcastDisplays)
+    screen.on('display-metrics-changed', broadcastDisplays)
+  })
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -446,6 +626,8 @@ app.on('will-quit', () => {
   screen.removeListener('display-added', broadcastDisplays)
   screen.removeListener('display-removed', broadcastDisplays)
   screen.removeListener('display-metrics-changed', broadcastDisplays)
+  statusTray?.destroy()
+  statusTray = null
 })
 
 ipcMain.handle('config:get', () => editableConfig)
@@ -472,15 +654,7 @@ ipcMain.handle(
 
 ipcMain.handle('displays:list', async () => listDisplays())
 
-ipcMain.handle('player:start', async () => {
-  if (playerWindows.length === 0) {
-    playbackConfig = await loadPlaybackConfig()
-    console.log('Starting player windows...')
-    createPlayerWindows()
-    broadcastConfig(playbackConfig)
-  }
-  return getStatus()
-})
+ipcMain.handle('player:start', async () => startPlayerMode())
 
 ipcMain.handle('player:stop', async () => {
   exitPlayerMode()
