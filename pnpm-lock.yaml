@@ -9,56 +9,56 @@ importers:
   .:
     dependencies:
       '@primeuix/themes':
-        specifier: ^2.0.2
+        specifier: 2.0.3
         version: 2.0.3
       electron-store:
-        specifier: ^11.0.2
+        specifier: 11.0.2
         version: 11.0.2
       primeicons:
-        specifier: ^7.0.0
+        specifier: 7.0.0
         version: 7.0.0
       primevue:
-        specifier: ^4.5.4
+        specifier: 4.5.5
         version: 4.5.5(vue@3.5.33(typescript@6.0.3))
       vue:
-        specifier: ^3.5.26
+        specifier: 3.5.33
         version: 3.5.33(typescript@6.0.3)
     devDependencies:
       '@types/node':
-        specifier: ^25.0.5
+        specifier: 25.6.0
         version: 25.6.0
       '@vitejs/plugin-vue':
-        specifier: ^6.0.3
+        specifier: 6.0.6
         version: 6.0.6(vite@8.0.10(@types/node@25.6.0)(esbuild@0.27.2)(sass-embedded@1.99.0)(sass@1.99.0))(vue@3.5.33(typescript@6.0.3))
       electron:
-        specifier: ^42.0.0
+        specifier: 42.0.0
         version: 42.0.0
       jsdom:
-        specifier: ^29.0.0
+        specifier: 29.1.1
         version: 29.1.1
       prettier:
-        specifier: ^3.8.1
+        specifier: 3.8.3
         version: 3.8.3
       sass-embedded:
-        specifier: ^1.98.0
+        specifier: 1.99.0
         version: 1.99.0
       typescript:
-        specifier: ^6.0.3
+        specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: ^8.0.10
+        specifier: 8.0.10
         version: 8.0.10(@types/node@25.6.0)(esbuild@0.27.2)(sass-embedded@1.99.0)(sass@1.99.0)
       vite-plugin-electron:
-        specifier: ^0.29.0
+        specifier: 0.29.1
         version: 0.29.1(vite-plugin-electron-renderer@0.14.7)
       vite-plugin-electron-renderer:
-        specifier: ^0.14.6
+        specifier: 0.14.7
         version: 0.14.7
       vitest:
-        specifier: ^4.1.0
+        specifier: 4.1.5
         version: 4.1.5(@types/node@25.6.0)(jsdom@29.1.1)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.27.2)(sass-embedded@1.99.0)(sass@1.99.0))
       vue-tsc:
-        specifier: ^3.2.5
+        specifier: 3.2.8
         version: 3.2.8(typescript@6.0.3)
 
 packages:
