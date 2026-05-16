@@ -28,6 +28,7 @@ module.exports = {
     hardenedRuntime: true,
     gatekeeperAssess: false,
     notarize: true,
+    publish: ['github'],
     entitlements: 'build/entitlements.mac.plist',
     entitlementsInherit: 'build/entitlements.mac.plist',
     extendInfo: {

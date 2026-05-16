@@ -4,5 +4,6 @@ dist
 dist-electron
 node_modules
 output
+pnpm-lock.yaml
 playwright-report
 test-results
