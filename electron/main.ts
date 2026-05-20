@@ -33,7 +33,10 @@ import {
   loadPlaybackConfig,
   saveConfig
 } from './config'
-import { shouldExitPlayerWindows } from './player-window-input'
+import {
+  createPlayerExitShortcutDetector,
+  shouldBlockPlayerWindowEscape
+} from './player-window-input'
 import { applyPlayerWindowPresentation } from './player-window'
 import {
   DEEP_LINK_SCHEME,
@@ -345,6 +348,7 @@ const createPlayerWindows = () => {
     playbackConfig,
     screen.getAllDisplays()
   )
+  const shouldExitPlayerWindows = createPlayerExitShortcutDetector()
 
   playerWindows = displays.map((display) => {
     const win = createWindow(
@@ -390,12 +394,14 @@ const createPlayerWindows = () => {
     })
 
     win.webContents.on('before-input-event', (event, input) => {
-      if (!shouldExitPlayerWindows(input)) {
+      if (!shouldBlockPlayerWindowEscape(input)) {
         return
       }
 
       event.preventDefault()
-      exitPlayerMode()
+      if (shouldExitPlayerWindows(input)) {
+        exitPlayerMode()
+      }
     })
 
     win.once('ready-to-show', () => {
