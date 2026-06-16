@@ -14,7 +14,9 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
+    "web:dev": "vitepress dev web",
     "build": "vite build",
+    "web:build": "vitepress build web",
     "package": "pnpm run package:mac",
     "package:mac": "pnpm run build && electron-builder --mac zip --arm64 --config electron-builder.config.cjs --publish never",
     "release": "pnpm run build && electron-builder --mac zip --arm64 --config electron-builder.config.cjs --publish always",
