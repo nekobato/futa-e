@@ -42,12 +42,14 @@ type MeteorAnimationConfig = {
 /**
  * Returns a random number inside the provided range.
  */
-const randomBetween = (min: number, max: number): number => min + Math.random() * (max - min)
+const randomBetween = (min: number, max: number): number =>
+  min + Math.random() * (max - min)
 
 /**
  * Restricts a value to the provided minimum and maximum bounds.
  */
-const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max)
+const clamp = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(value, min), max)
 
 /**
  * Formats an RGB tuple into an rgba() string.
@@ -64,7 +66,10 @@ const resizeCanvas = (
 ): { width: number; height: number } => {
   const width = window.innerWidth
   const height = window.innerHeight
-  const devicePixelRatio = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO)
+  const devicePixelRatio = Math.min(
+    window.devicePixelRatio || 1,
+    MAX_DEVICE_PIXEL_RATIO
+  )
 
   canvas.width = Math.floor(width * devicePixelRatio)
   canvas.height = Math.floor(height * devicePixelRatio)
@@ -76,7 +81,9 @@ const resizeCanvas = (
 /**
  * Builds a meteor background animation from a small configuration object.
  */
-export const createMeteorAnimation = (config: MeteorAnimationConfig): BackgroundAnimation => ({
+export const createMeteorAnimation = (
+  config: MeteorAnimationConfig
+): BackgroundAnimation => ({
   id: config.id,
   weight: config.weight,
   background: config.background,
@@ -87,18 +94,28 @@ export const createMeteorAnimation = (config: MeteorAnimationConfig): Background
       return () => {}
     }
 
-    const trajectoryAngleRadians = ((config.angleDegrees ?? DEFAULT_TRAJECTORY_ANGLE_DEGREES) * Math.PI) / 180
+    const trajectoryAngleRadians =
+      ((config.angleDegrees ?? DEFAULT_TRAJECTORY_ANGLE_DEGREES) * Math.PI) /
+      180
     const trajectoryCosine = Math.cos(trajectoryAngleRadians)
     const trajectorySine = Math.sin(trajectoryAngleRadians)
-    const [minimumBaseCount, maximumBaseCount] = config.baseCountRange ?? DEFAULT_BASE_COUNT_RANGE
+    const [minimumBaseCount, maximumBaseCount] =
+      config.baseCountRange ?? DEFAULT_BASE_COUNT_RANGE
     const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
     const abortController = new AbortController()
 
     /**
      * Calculates a meteor count that scales with the viewport area.
      */
-    const getMeteorCount = (viewportWidth: number, viewportHeight: number): number => {
-      const baseCount = clamp(Math.round((viewportWidth + viewportHeight) / 120), minimumBaseCount, maximumBaseCount)
+    const getMeteorCount = (
+      viewportWidth: number,
+      viewportHeight: number
+    ): number => {
+      const baseCount = clamp(
+        Math.round((viewportWidth + viewportHeight) / 120),
+        minimumBaseCount,
+        maximumBaseCount
+      )
 
       return Math.max(1, Math.round(baseCount * config.densityMultiplier))
     }
@@ -112,7 +129,8 @@ export const createMeteorAnimation = (config: MeteorAnimationConfig): Background
       viewportHeight: number,
       phase: 'initial' | 'respawn'
     ): Meteor => {
-      meteor.delayMs = phase === 'initial' ? randomBetween(0, 2400) : randomBetween(180, 1600)
+      meteor.delayMs =
+        phase === 'initial' ? randomBetween(0, 2400) : randomBetween(180, 1600)
 
       if (phase === 'initial') {
         meteor.x = randomBetween(-viewportWidth * 0.2, viewportWidth * 1.05)
@@ -160,9 +178,13 @@ export const createMeteorAnimation = (config: MeteorAnimationConfig): Background
     /**
      * Builds the meteor field for the current viewport.
      */
-    const createMeteorField = (viewportWidth: number, viewportHeight: number): Meteor[] =>
-      Array.from({ length: getMeteorCount(viewportWidth, viewportHeight) }, () =>
-        createMeteor(viewportWidth, viewportHeight, 'initial')
+    const createMeteorField = (
+      viewportWidth: number,
+      viewportHeight: number
+    ): Meteor[] =>
+      Array.from(
+        { length: getMeteorCount(viewportWidth, viewportHeight) },
+        () => createMeteor(viewportWidth, viewportHeight, 'initial')
       )
 
     /**
@@ -198,17 +220,28 @@ export const createMeteorAnimation = (config: MeteorAnimationConfig): Background
     /**
      * Draws a single meteor streak and its highlight.
      */
-    const drawMeteor = (drawingContext: CanvasRenderingContext2D, meteor: Meteor): void => {
+    const drawMeteor = (
+      drawingContext: CanvasRenderingContext2D,
+      meteor: Meteor
+    ): void => {
       if (meteor.delayMs > 0) {
         return
       }
 
       const tailX = meteor.x - trajectoryCosine * meteor.length
       const tailY = meteor.y - trajectorySine * meteor.length
-      const gradient = drawingContext.createLinearGradient(tailX, tailY, meteor.x, meteor.y)
+      const gradient = drawingContext.createLinearGradient(
+        tailX,
+        tailY,
+        meteor.x,
+        meteor.y
+      )
 
       gradient.addColorStop(0, toRgba(config.trailColor, 0))
-      gradient.addColorStop(0.55, toRgba(config.trailColor, meteor.opacity * 0.35))
+      gradient.addColorStop(
+        0.55,
+        toRgba(config.trailColor, meteor.opacity * 0.35)
+      )
       gradient.addColorStop(1, toRgba(config.headColor, meteor.opacity))
 
       drawingContext.save()
@@ -216,7 +249,10 @@ export const createMeteorAnimation = (config: MeteorAnimationConfig): Background
       drawingContext.lineCap = 'round'
       drawingContext.strokeStyle = gradient
       drawingContext.lineWidth = meteor.thickness
-      drawingContext.shadowColor = toRgba(config.trailColor, meteor.opacity * 0.55)
+      drawingContext.shadowColor = toRgba(
+        config.trailColor,
+        meteor.opacity * 0.55
+      )
       drawingContext.shadowBlur = meteor.glow
       drawingContext.beginPath()
       drawingContext.moveTo(tailX, tailY)
@@ -224,7 +260,13 @@ export const createMeteorAnimation = (config: MeteorAnimationConfig): Background
       drawingContext.stroke()
       drawingContext.fillStyle = toRgba(config.headColor, meteor.opacity)
       drawingContext.beginPath()
-      drawingContext.arc(meteor.x, meteor.y, meteor.thickness * 0.75, 0, Math.PI * 2)
+      drawingContext.arc(
+        meteor.x,
+        meteor.y,
+        meteor.thickness * 0.75,
+        0,
+        Math.PI * 2
+      )
       drawingContext.fill()
       drawingContext.restore()
     }
@@ -269,7 +311,10 @@ export const createMeteorAnimation = (config: MeteorAnimationConfig): Background
         lastFrameTimestamp = timestamp
       }
 
-      const deltaSeconds = Math.min((timestamp - lastFrameTimestamp) / 1000, 0.05)
+      const deltaSeconds = Math.min(
+        (timestamp - lastFrameTimestamp) / 1000,
+        0.05
+      )
       lastFrameTimestamp = timestamp
       renderScene(deltaSeconds)
       animationFrameId = requestAnimationFrame(tick)

@@ -27,6 +27,8 @@ export default defineConfig({
         items: [{ text: 'Catalog', link: '/' }, ...backgroundLinks]
       }
     ],
-    socialLinks: [{ icon: 'github', link: 'https://github.com/nekobato/futa-e' }]
+    socialLinks: [
+      { icon: 'github', link: 'https://github.com/nekobato/futa-e' }
+    ]
   }
 })

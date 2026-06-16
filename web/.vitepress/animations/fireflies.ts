@@ -3,7 +3,12 @@
  */
 
 import type { BackgroundAnimation } from './types'
-import { TAU, initializeCanvasAnimation, randomBetween, type CanvasViewport } from './shared'
+import {
+  TAU,
+  initializeCanvasAnimation,
+  randomBetween,
+  type CanvasViewport
+} from './shared'
 
 type Firefly = {
   x: number
@@ -24,7 +29,9 @@ type FirefliesScene = {
  * Creates a softly moving firefly field.
  */
 const createScene = (viewport: CanvasViewport): FirefliesScene => {
-  const count = Math.round(Math.min(70, Math.max(20, (viewport.width + viewport.height) / 42)))
+  const count = Math.round(
+    Math.min(70, Math.max(20, (viewport.width + viewport.height) / 42))
+  )
 
   return {
     fireflies: Array.from({ length: count }, () => ({
@@ -43,7 +50,11 @@ const createScene = (viewport: CanvasViewport): FirefliesScene => {
 /**
  * Moves a firefly and bounces it softly at the viewport edges.
  */
-const updateFirefly = (firefly: Firefly, deltaSeconds: number, viewport: CanvasViewport): void => {
+const updateFirefly = (
+  firefly: Firefly,
+  deltaSeconds: number,
+  viewport: CanvasViewport
+): void => {
   firefly.x += firefly.velocityX * deltaSeconds
   firefly.y += firefly.velocityY * deltaSeconds
 
@@ -63,9 +74,19 @@ const drawFirefly = (
   firefly: Firefly,
   elapsedSeconds: number
 ): void => {
-  const pulse = 0.45 + Math.sin(elapsedSeconds * firefly.pulseSpeed + firefly.phase) * 0.35 + 0.2
+  const pulse =
+    0.45 +
+    Math.sin(elapsedSeconds * firefly.pulseSpeed + firefly.phase) * 0.35 +
+    0.2
   const glowRadius = firefly.radius * (6 + pulse * 7)
-  const gradient = context.createRadialGradient(firefly.x, firefly.y, 0, firefly.x, firefly.y, glowRadius)
+  const gradient = context.createRadialGradient(
+    firefly.x,
+    firefly.y,
+    0,
+    firefly.x,
+    firefly.y,
+    glowRadius
+  )
 
   gradient.addColorStop(0, `hsla(${firefly.hue}, 95%, 72%, ${0.46 * pulse})`)
   gradient.addColorStop(0.3, `hsla(${firefly.hue}, 88%, 62%, ${0.2 * pulse})`)

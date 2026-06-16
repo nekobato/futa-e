@@ -21,24 +21,30 @@ export type RenderSceneParams<TScene> = {
 }
 
 export type CanvasAnimationOptions<TScene> = {
-  createScene: (viewport: CanvasViewport, context: CanvasRenderingContext2D) => TScene
+  createScene: (
+    viewport: CanvasViewport,
+    context: CanvasRenderingContext2D
+  ) => TScene
   renderScene: (params: RenderSceneParams<TScene>) => void
 }
 
 /**
  * Restricts a value to the provided minimum and maximum bounds.
  */
-export const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max)
+export const clamp = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(value, min), max)
 
 /**
  * Returns a random number inside the provided range.
  */
-export const randomBetween = (min: number, max: number): number => min + Math.random() * (max - min)
+export const randomBetween = (min: number, max: number): number =>
+  min + Math.random() * (max - min)
 
 /**
  * Returns a random integer inside the inclusive range.
  */
-export const randomInteger = (min: number, max: number): number => Math.floor(randomBetween(min, max + 1))
+export const randomInteger = (min: number, max: number): number =>
+  Math.floor(randomBetween(min, max + 1))
 
 /**
  * Resizes a canvas to viewport-sized CSS pixels with a capped device pixel ratio.
@@ -49,7 +55,10 @@ export const resizeCanvas = (
 ): CanvasViewport => {
   const width = window.innerWidth
   const height = window.innerHeight
-  const devicePixelRatio = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO)
+  const devicePixelRatio = Math.min(
+    window.devicePixelRatio || 1,
+    MAX_DEVICE_PIXEL_RATIO
+  )
 
   canvas.width = Math.floor(width * devicePixelRatio)
   canvas.height = Math.floor(height * devicePixelRatio)
@@ -81,7 +90,10 @@ export const initializeCanvasAnimation = <TScene>(
   /**
    * Renders the scene with the current viewport and time values.
    */
-  const renderCurrentScene = (deltaSeconds: number, elapsedSeconds: number): void => {
+  const renderCurrentScene = (
+    deltaSeconds: number,
+    elapsedSeconds: number
+  ): void => {
     options.renderScene({
       scene,
       viewport,

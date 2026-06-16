@@ -3,7 +3,12 @@
  */
 
 import type { BackgroundAnimation } from './types'
-import { TAU, initializeCanvasAnimation, randomBetween, type CanvasViewport } from './shared'
+import {
+  TAU,
+  initializeCanvasAnimation,
+  randomBetween,
+  type CanvasViewport
+} from './shared'
 
 type AuroraRibbon = {
   baseY: number
@@ -51,8 +56,15 @@ const drawRibbon = (
     const progress = index / segments
     const x = progress * viewport.width
     const wave =
-      Math.sin(progress * TAU * 1.4 + ribbon.phase + elapsedSeconds * ribbon.speed) * ribbon.amplitude +
-      Math.sin(progress * TAU * 3.1 + ribbon.phase * 0.7 + elapsedSeconds * ribbon.speed * 1.6) *
+      Math.sin(
+        progress * TAU * 1.4 + ribbon.phase + elapsedSeconds * ribbon.speed
+      ) *
+        ribbon.amplitude +
+      Math.sin(
+        progress * TAU * 3.1 +
+          ribbon.phase * 0.7 +
+          elapsedSeconds * ribbon.speed * 1.6
+      ) *
         ribbon.amplitude *
         0.34
     const y = ribbon.baseY + wave
@@ -60,7 +72,12 @@ const drawRibbon = (
     bottomPoints.push({ x, y: y + ribbon.thickness * 0.58 })
   }
 
-  const gradient = context.createLinearGradient(0, ribbon.baseY - ribbon.thickness, 0, ribbon.baseY + ribbon.thickness)
+  const gradient = context.createLinearGradient(
+    0,
+    ribbon.baseY - ribbon.thickness,
+    0,
+    ribbon.baseY + ribbon.thickness
+  )
   gradient.addColorStop(0, `hsla(${ribbon.hue}, 90%, 68%, 0)`)
   gradient.addColorStop(0.45, `hsla(${ribbon.hue}, 92%, 64%, ${ribbon.alpha})`)
   gradient.addColorStop(1, `hsla(${ribbon.hue + 32}, 86%, 58%, 0)`)
@@ -97,7 +114,9 @@ const renderScene = ({
   context.save()
   context.globalCompositeOperation = 'screen'
   context.filter = 'blur(10px)'
-  scene.ribbons.forEach((ribbon) => drawRibbon(context, viewport, ribbon, elapsedSeconds))
+  scene.ribbons.forEach((ribbon) =>
+    drawRibbon(context, viewport, ribbon, elapsedSeconds)
+  )
   context.restore()
 }
 

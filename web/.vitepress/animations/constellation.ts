@@ -3,7 +3,12 @@
  */
 
 import type { BackgroundAnimation } from './types'
-import { TAU, initializeCanvasAnimation, randomBetween, type CanvasViewport } from './shared'
+import {
+  TAU,
+  initializeCanvasAnimation,
+  randomBetween,
+  type CanvasViewport
+} from './shared'
 
 type NodePoint = {
   x: number
@@ -21,7 +26,9 @@ type ConstellationScene = {
  * Creates a field of moving constellation points.
  */
 const createScene = (viewport: CanvasViewport): ConstellationScene => {
-  const count = Math.round(Math.min(110, Math.max(44, (viewport.width * viewport.height) / 16000)))
+  const count = Math.round(
+    Math.min(110, Math.max(44, (viewport.width * viewport.height) / 16000))
+  )
 
   return {
     points: Array.from({ length: count }, () => ({
@@ -37,7 +44,11 @@ const createScene = (viewport: CanvasViewport): ConstellationScene => {
 /**
  * Moves one constellation point within the viewport.
  */
-const updatePoint = (point: NodePoint, deltaSeconds: number, viewport: CanvasViewport): void => {
+const updatePoint = (
+  point: NodePoint,
+  deltaSeconds: number,
+  viewport: CanvasViewport
+): void => {
   point.x += point.velocityX * deltaSeconds
   point.y += point.velocityY * deltaSeconds
 
@@ -83,7 +94,11 @@ const drawConnections = (
 /**
  * Draws all constellation nodes.
  */
-const drawPoints = (context: CanvasRenderingContext2D, points: NodePoint[], elapsedSeconds: number): void => {
+const drawPoints = (
+  context: CanvasRenderingContext2D,
+  points: NodePoint[],
+  elapsedSeconds: number
+): void => {
   points.forEach((point, index) => {
     const shimmer = 0.72 + Math.sin(elapsedSeconds * 1.4 + index * 0.71) * 0.28
     context.fillStyle = `rgba(235, 247, 255, ${0.5 + shimmer * 0.42})`

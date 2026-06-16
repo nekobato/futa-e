@@ -3,7 +3,11 @@
  */
 
 import type { BackgroundAnimation } from './types'
-import { initializeCanvasAnimation, randomBetween, type CanvasViewport } from './shared'
+import {
+  initializeCanvasAnimation,
+  randomBetween,
+  type CanvasViewport
+} from './shared'
 
 type FlowParticle = {
   x: number
@@ -39,8 +43,13 @@ const createParticle = (viewport: CanvasViewport): FlowParticle => {
  * Creates a flow field scene sized for the viewport.
  */
 const createScene = (viewport: CanvasViewport): FlowFieldScene => ({
-  particles: Array.from({ length: Math.round(Math.min(980, Math.max(260, (viewport.width * viewport.height) / 1400))) }, () =>
-    createParticle(viewport)
+  particles: Array.from(
+    {
+      length: Math.round(
+        Math.min(980, Math.max(260, (viewport.width * viewport.height) / 1400))
+      )
+    },
+    () => createParticle(viewport)
   )
 })
 
@@ -55,7 +64,10 @@ const getFlowAngle = (x: number, y: number, elapsedSeconds: number): number =>
 /**
  * Respawns a particle near a random edge so streams keep crossing the viewport.
  */
-const respawnParticle = (particle: FlowParticle, viewport: CanvasViewport): void => {
+const respawnParticle = (
+  particle: FlowParticle,
+  viewport: CanvasViewport
+): void => {
   const edge = Math.floor(randomBetween(0, 4))
 
   if (edge === 0) {
@@ -93,7 +105,12 @@ const updateParticle = (
   particle.x += Math.cos(angle) * particle.speed * deltaSeconds
   particle.y += Math.sin(angle) * particle.speed * deltaSeconds
 
-  if (particle.x < -24 || particle.x > viewport.width + 24 || particle.y < -24 || particle.y > viewport.height + 24) {
+  if (
+    particle.x < -24 ||
+    particle.x > viewport.width + 24 ||
+    particle.y < -24 ||
+    particle.y > viewport.height + 24
+  ) {
     respawnParticle(particle, viewport)
   }
 }

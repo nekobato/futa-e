@@ -71,10 +71,12 @@ const renderScene = ({
 
   scene.points.forEach((point) => {
     const y = point.baseY + getWaveOffset(point, elapsedSeconds)
-    const x = point.baseX + Math.sin(elapsedSeconds * 0.35 + point.row * 0.17) * 7
+    const x =
+      point.baseX + Math.sin(elapsedSeconds * 0.35 + point.row * 0.17) * 7
     const perspective = 0.45 + point.depth * 0.85
     const alpha = Math.max(0.08, 0.44 - point.depth * 0.18)
-    const radius = perspective * (1.1 + Math.sin(elapsedSeconds + point.phase) * 0.22)
+    const radius =
+      perspective * (1.1 + Math.sin(elapsedSeconds + point.phase) * 0.22)
 
     context.fillStyle = `rgba(188, 231, 255, ${alpha})`
     context.beginPath()

@@ -20,17 +20,20 @@ type RainDrop = {
 /**
  * Returns a random number inside the provided range.
  */
-const randomBetween = (min: number, max: number): number => min + Math.random() * (max - min)
+const randomBetween = (min: number, max: number): number =>
+  min + Math.random() * (max - min)
 
 /**
  * Restricts a value to the provided minimum and maximum bounds.
  */
-const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max)
+const clamp = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(value, min), max)
 
 /**
  * Formats an alpha value as a white-blue rain color.
  */
-const toRainColor = (alpha: number): string => `rgba(230, 241, 255, ${clamp(alpha, 0, 1)})`
+const toRainColor = (alpha: number): string =>
+  `rgba(230, 241, 255, ${clamp(alpha, 0, 1)})`
 
 /**
  * Resizes the canvas to match the viewport and device pixel ratio.
@@ -41,7 +44,10 @@ const resizeCanvas = (
 ): { width: number; height: number } => {
   const width = window.innerWidth
   const height = window.innerHeight
-  const devicePixelRatio = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO)
+  const devicePixelRatio = Math.min(
+    window.devicePixelRatio || 1,
+    MAX_DEVICE_PIXEL_RATIO
+  )
 
   canvas.width = Math.floor(width * devicePixelRatio)
   canvas.height = Math.floor(height * devicePixelRatio)
@@ -79,7 +85,11 @@ const positionDrop = (
 /**
  * Creates a single raindrop with randomized visual properties.
  */
-const createDrop = (viewportWidth: number, viewportHeight: number, phase: 'initial' | 'respawn'): RainDrop =>
+const createDrop = (
+  viewportWidth: number,
+  viewportHeight: number,
+  phase: 'initial' | 'respawn'
+): RainDrop =>
   positionDrop(
     {
       x: 0,
@@ -97,7 +107,10 @@ const createDrop = (viewportWidth: number, viewportHeight: number, phase: 'initi
 /**
  * Builds the rain field for the current viewport.
  */
-const createRainField = (viewportWidth: number, viewportHeight: number): RainDrop[] =>
+const createRainField = (
+  viewportWidth: number,
+  viewportHeight: number
+): RainDrop[] =>
   Array.from({ length: getDropCount(viewportWidth, viewportHeight) }, () =>
     createDrop(viewportWidth, viewportHeight, 'initial')
   )
@@ -117,7 +130,10 @@ const updateDrop = (
   drop.x += velocityX * deltaSeconds
   drop.y += velocityY * deltaSeconds
 
-  if (drop.x > viewportWidth + OFFSCREEN_MARGIN || drop.y > viewportHeight + OFFSCREEN_MARGIN) {
+  if (
+    drop.x > viewportWidth + OFFSCREEN_MARGIN ||
+    drop.y > viewportHeight + OFFSCREEN_MARGIN
+  ) {
     positionDrop(drop, viewportWidth, viewportHeight, 'respawn')
   }
 }
@@ -205,7 +221,10 @@ export const animation: BackgroundAnimation = {
         lastFrameTimestamp = timestamp
       }
 
-      const deltaSeconds = Math.min((timestamp - lastFrameTimestamp) / 1000, 0.05)
+      const deltaSeconds = Math.min(
+        (timestamp - lastFrameTimestamp) / 1000,
+        0.05
+      )
       lastFrameTimestamp = timestamp
       renderScene(deltaSeconds)
       animationFrameId = requestAnimationFrame(tick)

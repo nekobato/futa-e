@@ -10,8 +10,8 @@ import {
   screen,
   Tray
 } from 'electron'
-import { fileURLToPath, pathToFileURL } from 'node:url'
-import { dirname, extname, isAbsolute, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { extname, isAbsolute, join } from 'node:path'
 import { existsSync, promises as fs } from 'node:fs'
 import type {
   AssetType,
@@ -45,8 +45,6 @@ import {
   type DeepLinkCommand
 } from './deep-link'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
 const APP_NAME = 'Futa E'
 const LOCAL_MEDIA_SCHEME = 'futae-media'
 
@@ -77,7 +75,9 @@ let heartbeatInterval: NodeJS.Timeout | null = null
 let deepLinksReady = false
 const queuedDeepLinkCommands: DeepLinkCommand[] = []
 
-const getPreloadPath = () => join(__dirname, 'preload.js')
+/** Returns the bundled preload script path from the current application root. */
+const getPreloadPath = () =>
+  join(app.getAppPath(), 'dist-electron', 'preload.js')
 
 /** Returns the project-local PNG used for Electron window and dock icons. */
 const getAppIconPath = () => join(app.getAppPath(), 'resources', 'app-icon.png')
