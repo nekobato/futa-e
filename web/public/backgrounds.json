@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "updatedAt": "2026-06-16",
+  "baseUrl": "https://nekobato.github.io/futa-e/",
+  "items": [
+    {
+      "name": "stars",
+      "title": "Stars",
+      "type": "web",
+      "url": "https://nekobato.github.io/futa-e/stars/",
+      "description": "Soft meteor trails based on the nekobato.net meteor-soft background logic.",
+      "params": {},
+      "defaultDurationSec": 60
+    },
+    {
+      "name": "rain",
+      "title": "Rain",
+      "type": "web",
+      "url": "https://nekobato.github.io/futa-e/rain/",
+      "description": "Slanted rain streaks based on the nekobato.net rain background logic.",
+      "params": {},
+      "defaultDurationSec": 60
+    },
+    {
+      "name": "aurora",
+      "title": "Aurora",
+      "type": "web",
+      "url": "https://nekobato.github.io/futa-e/aurora/",
+      "description": "Soft translucent aurora ribbons moving across a dark northern sky.",
+      "params": {},
+      "defaultDurationSec": 60
+    },
+    {
+      "name": "fireflies",
+      "title": "Fireflies",
+      "type": "web",
+      "url": "https://nekobato.github.io/futa-e/fireflies/",
+      "description": "Slow firefly glows drifting and pulsing over a quiet night background.",
+      "params": {},
+      "defaultDurationSec": 60
+    },
+    {
+      "name": "flow-field",
+      "title": "Flow Field",
+      "type": "web",
+      "url": "https://nekobato.github.io/futa-e/flow-field/",
+      "description": "Particles trace a procedural vector field and leave calm fading trails.",
+      "params": {},
+      "defaultDurationSec": 60
+    },
+    {
+      "name": "constellation",
+      "title": "Constellation",
+      "type": "web",
+      "url": "https://nekobato.github.io/futa-e/constellation/",
+      "description": "Moving star nodes connect into a lightweight constellation network.",
+      "params": {},
+      "defaultDurationSec": 60
+    },
+    {
+      "name": "particle-waves",
+      "title": "Particle Waves",
+      "type": "web",
+      "url": "https://nekobato.github.io/futa-e/particle-waves/",
+      "description": "A field of glowing points forms a subtle animated wave surface.",
+      "params": {},
+      "defaultDurationSec": 60
+    },
+    {
+      "name": "lifegame",
+      "title": "Life Game",
+      "type": "web",
+      "url": "https://nekobato.github.io/futa-e/lifegame/",
+      "description": "Conway's Game of Life starts from a random state and keeps gently evolving.",
+      "params": {},
+      "defaultDurationSec": 60
+    }
+  ]
+}

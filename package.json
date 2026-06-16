@@ -48,6 +48,7 @@
     "vite-plugin-electron": "0.29.1",
     "vite-plugin-electron-renderer": "0.14.7",
     "vitest": "4.1.5",
-    "vue-tsc": "3.2.8"
+    "vue-tsc": "3.2.8",
+    "vitepress": "^1.6.4"
   }
 }
