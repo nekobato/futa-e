@@ -37,7 +37,10 @@ import {
   createPlayerExitShortcutDetector,
   shouldBlockPlayerWindowEscape
 } from './player-window-input'
-import { applyPlayerWindowPresentation } from './player-window'
+import {
+  applyPlayerWindowPresentation,
+  restorePlayerWindowPresentation
+} from './player-window'
 import {
   DEEP_LINK_SCHEME,
   findDeepLinkArg,
@@ -74,6 +77,7 @@ const heartbeatMap = new Map<number, number>()
 let heartbeatInterval: NodeJS.Timeout | null = null
 let deepLinksReady = false
 const queuedDeepLinkCommands: DeepLinkCommand[] = []
+let closePlayerWindowsTask: Promise<void> | null = null
 
 /** Returns the bundled preload script path from the current application root. */
 const getPreloadPath = () =>
@@ -400,7 +404,7 @@ const createPlayerWindows = () => {
 
       event.preventDefault()
       if (shouldExitPlayerWindows(input)) {
-        exitPlayerMode()
+        void exitPlayerMode()
       }
     })
 
@@ -424,11 +428,49 @@ const createPlayerWindows = () => {
   startHeartbeatMonitor()
 }
 
-const closePlayerWindows = () => {
-  playerWindows.forEach((win) => win.close())
+/** Resolves once Electron has emitted a closed event for the target window. */
+const waitForWindowClosed = (win: BrowserWindow): Promise<void> => {
+  if (win.isDestroyed()) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve) => {
+    win.once('closed', resolve)
+    win.close()
+  })
+}
+
+/** Restores presentation state and closes a player window. */
+const closePlayerWindow = async (win: BrowserWindow): Promise<void> => {
+  if (win.isDestroyed()) {
+    return
+  }
+
+  await restorePlayerWindowPresentation(win)
+  await waitForWindowClosed(win)
+}
+
+/** Closes every player window after leaving kiosk presentation mode. */
+const closePlayerWindows = async (): Promise<void> => {
+  if (closePlayerWindowsTask) {
+    return closePlayerWindowsTask
+  }
+
+  const windows = playerWindows
   playerWindows = []
   stopHeartbeatMonitor()
   updateStatusTrayMenu()
+
+  closePlayerWindowsTask = Promise.all(windows.map(closePlayerWindow)).then(
+    () => undefined
+  )
+
+  try {
+    await closePlayerWindowsTask
+  } finally {
+    closePlayerWindowsTask = null
+    updateStatusTrayMenu()
+  }
 }
 
 const restoreControlWindow = () => {
@@ -446,8 +488,8 @@ const restoreControlWindow = () => {
   controlWindow.moveTop()
 }
 
-const exitPlayerMode = () => {
-  closePlayerWindows()
+const exitPlayerMode = async () => {
+  await closePlayerWindows()
   restoreControlWindow()
 }
 
@@ -458,6 +500,10 @@ const getStatus = (): PlayerStatus => ({
 
 /** Starts player windows if kiosk mode is not already running. */
 const startPlayerMode = async (): Promise<PlayerStatus> => {
+  if (closePlayerWindowsTask) {
+    await closePlayerWindowsTask
+  }
+
   if (playerWindows.length === 0) {
     playbackConfig = await loadPlaybackConfig()
     console.log('Starting player windows...')
@@ -487,7 +533,7 @@ const updateStatusTrayMenu = () => {
         label: isRunning ? 'Kioskを停止' : 'Kioskを開始',
         click: () => {
           if (isRunning) {
-            exitPlayerMode()
+            void exitPlayerMode()
             return
           }
 
@@ -529,7 +575,7 @@ const runDeepLinkCommand = async (command: DeepLinkCommand) => {
     return
   }
   if (command === 'stop-player') {
-    exitPlayerMode()
+    await exitPlayerMode()
     return
   }
 
@@ -569,7 +615,7 @@ const updateConfig = async (next: PlayerConfig): Promise<PlayerConfig> => {
   playbackConfig = await loadPlaybackConfig()
 
   if (playerWindows.length > 0) {
-    closePlayerWindows()
+    await closePlayerWindows()
     createPlayerWindows()
   }
 
@@ -663,7 +709,7 @@ ipcMain.handle('displays:list', async () => listDisplays())
 ipcMain.handle('player:start', async () => startPlayerMode())
 
 ipcMain.handle('player:stop', async () => {
-  exitPlayerMode()
+  await exitPlayerMode()
   return getStatus()
 })
 
