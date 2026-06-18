@@ -3,7 +3,10 @@ import {
   createPlaybackOrder,
   createShuffledIndices,
   firstPlayablePointer,
-  nextPlayablePointer
+  getItemPlaybackMode,
+  isItemHeldForever,
+  nextPlayablePointer,
+  resolveItemAdvancePolicy
 } from '../../src/shared/playback'
 
 describe('playback helpers', () => {
@@ -24,5 +27,31 @@ describe('playback helpers', () => {
 
   it('finds the next playable pointer and skips excluded indices', () => {
     expect(nextPlayablePointer([0, 1, 2, 3], 0, new Set([1, 2]))).toBe(3)
+  })
+
+  it('resolves legacy duration items as explicit duration playback', () => {
+    expect(getItemPlaybackMode({ durationSec: 12 })).toBe('duration')
+  })
+
+  it('keeps forever items on the current playback item', () => {
+    expect(isItemHeldForever({ playbackMode: 'forever' })).toBe(true)
+    expect(
+      resolveItemAdvancePolicy(
+        { type: 'image', playbackMode: 'forever', durationSec: 12 },
+        10
+      )
+    ).toEqual({ type: 'hold' })
+  })
+
+  it('uses media end for automatic video playback', () => {
+    expect(
+      resolveItemAdvancePolicy({ type: 'video', playbackMode: 'auto' }, 10)
+    ).toEqual({ type: 'media-end' })
+  })
+
+  it('uses the playlist default timer for automatic image playback', () => {
+    expect(
+      resolveItemAdvancePolicy({ type: 'image', playbackMode: 'auto' }, 10)
+    ).toEqual({ type: 'timer', delayMs: 10000 })
   })
 })

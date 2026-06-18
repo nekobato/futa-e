@@ -1,10 +1,16 @@
 export type AssetType = 'image' | 'video' | 'web'
 
+/**
+ * Controls how a playlist item advances after it starts rendering.
+ */
+export type PlaylistItemPlaybackMode = 'auto' | 'duration' | 'forever'
+
 export type PlaylistItem = {
   id: string
   type: AssetType
   src: string
   originUrl?: string
+  playbackMode?: PlaylistItemPlaybackMode
   durationSec?: number
   fallbackSrc?: string
   mute?: boolean

@@ -14,6 +14,7 @@
         v-else-if="currentItem?.type === 'video'"
         :src="currentSource"
         :muted="currentItem?.mute ?? false"
+        :loop="currentItemHeldForever"
         autoplay
         playsinline
         @ended="onVideoEnded"
@@ -76,7 +77,9 @@ import {
 import {
   createPlaybackOrder,
   firstPlayablePointer,
-  nextPlayablePointer
+  isItemHeldForever,
+  nextPlayablePointer,
+  resolveItemAdvancePolicy
 } from '../shared/playback'
 import type { DisplayInfo, PlayerConfig, PlaylistItem } from '../shared/types'
 import { isLikelyLocalFilePath, titleFromPath } from '../shared/utils'
@@ -124,6 +127,9 @@ const displayEnabled = computed(
 const activePlaylist = computed(() => effectiveActivePlaylistConfig.value.items)
 const currentItem = computed(
   () => activePlaylist.value[currentIndex.value] ?? null
+)
+const currentItemHeldForever = computed(() =>
+  isItemHeldForever(currentItem.value)
 )
 const currentItemAlt = computed(() =>
   currentItem.value
@@ -225,21 +231,18 @@ const startPlaybackForItem = (item: PlaylistItem | null) => {
   safeModeMessage.value = ''
   webState.value = item.type === 'web' ? 'loading' : 'ready'
 
-  if (item.type === 'video') {
-    if (item.durationSec) {
-      scheduleNext(item.durationSec * 1000)
-    }
-    return
-  }
-
   if (item.type === 'web') {
     startWebTimeout()
   }
 
-  scheduleNext(
-    (item.durationSec ??
-      effectiveActivePlaylistConfig.value.defaultDurationSec) * 1000
+  const advancePolicy = resolveItemAdvancePolicy(
+    item,
+    effectiveActivePlaylistConfig.value.defaultDurationSec
   )
+
+  if (advancePolicy.type === 'timer') {
+    scheduleNext(advancePolicy.delayMs)
+  }
 }
 
 const selectPointer = (pointer: number | null) => {
@@ -322,6 +325,10 @@ const stepNext = () => {
 }
 
 const onVideoEnded = () => {
+  if (currentItemHeldForever.value) {
+    return
+  }
+
   stepNext()
 }
 

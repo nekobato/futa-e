@@ -45,6 +45,64 @@ describe('config coercion', () => {
     expect(config.activePlaylistId).toBe('playlist-2')
   })
 
+  it('normalizes playlist item playback modes', () => {
+    const config = coerceConfig({
+      version: 1,
+      activePlaylistId: 'playlist-1',
+      playlists: [
+        {
+          id: 'playlist-1',
+          name: 'プレイリスト 1',
+          perDisplay: false,
+          loop: true,
+          shuffle: false,
+          defaultDurationSec: 10,
+          webTimeoutSec: 8,
+          items: [
+            {
+              id: 'legacy-duration',
+              type: 'image',
+              src: '/duration.png',
+              durationSec: 12
+            },
+            {
+              id: 'forever',
+              type: 'web',
+              src: 'https://example.com',
+              playbackMode: 'forever',
+              durationSec: 20
+            },
+            {
+              id: 'explicit-auto',
+              type: 'image',
+              src: '/auto.png',
+              playbackMode: 'auto',
+              durationSec: 20
+            }
+          ]
+        }
+      ],
+      displays: {},
+      updatedAt: '2026-03-18T00:00:00.000Z'
+    })
+
+    expect(config.playlists[0]?.items[0]).toMatchObject({
+      id: 'legacy-duration',
+      playbackMode: 'duration',
+      durationSec: 12
+    })
+    expect(config.playlists[0]?.items[1]).toMatchObject({
+      id: 'forever',
+      playbackMode: 'forever'
+    })
+    expect(config.playlists[0]?.items[1]?.durationSec).toBeUndefined()
+    expect(config.playlists[0]?.items[2]).toMatchObject({
+      id: 'explicit-auto',
+      playbackMode: 'auto'
+    })
+    expect(config.playlists[0]?.items[2]?.durationSec).toBeUndefined()
+  })
+
   it('converts legacy playlist and overlay settings into playlists', () => {
     const config = coerceConfig({
       version: 1,

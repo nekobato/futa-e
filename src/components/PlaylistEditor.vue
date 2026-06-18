@@ -67,6 +67,11 @@
                   {{ itemStateLabel(slotProps.item.item) }}
                 </div>
               </div>
+              <Tag
+                v-if="getItemPlaybackMode(slotProps.item.item) === 'forever'"
+                value="無期限"
+                severity="info"
+              />
             </div>
 
             <div class="playlist-item-actions">
@@ -185,14 +190,35 @@
         </div>
 
         <div v-if="showDraftDuration" class="field">
-          <label :for="urlDurationInputId">表示時間（秒）</label>
+          <label :id="playbackModeLabelId">表示方法</label>
+          <SelectButton
+            :modelValue="draftPlaybackMode"
+            :options="playbackModeOptions"
+            optionLabel="label"
+            optionValue="value"
+            :allowEmpty="false"
+            :ariaLabelledby="playbackModeLabelId"
+            size="small"
+            class="choice-group playback-choice-group"
+            @update:modelValue="handleDraftPlaybackModeChange"
+          />
+          <p :id="playbackModeNoteId" class="surface-note">
+            {{ playbackModeNote }}
+          </p>
+        </div>
+
+        <div
+          v-if="showDraftDuration && draftPlaybackMode === 'duration'"
+          class="field"
+        >
+          <label :for="urlDurationInputId">秒数</label>
           <InputNumber
             :inputId="urlDurationInputId"
             v-model="urlDuration"
             size="small"
-            :min="draftType === 'video' ? undefined : 2"
+            :min="draftDurationMin"
             :max="36000"
-            placeholder="自動"
+            :aria-describedby="playbackModeNoteId"
             @blur="commitDraftDuration"
           />
         </div>
@@ -285,8 +311,17 @@
 import { computed, ref } from 'vue'
 import Timeline from 'primevue/timeline'
 import { getFutaeApi } from '../shared/api'
-import type { AssetType, PickedAsset, PlaylistItem } from '../shared/types'
-import { createId, titleFromPath } from '../shared/utils'
+import {
+  getItemPlaybackMode,
+  normalizePlaylistItemPlaybackMode
+} from '../shared/playback'
+import type {
+  AssetType,
+  PickedAsset,
+  PlaylistItem,
+  PlaylistItemPlaybackMode
+} from '../shared/types'
+import { clampNumber, createId, titleFromPath } from '../shared/utils'
 
 type DraftSourceMode = 'file' | 'url'
 type ItemDialogMode = 'add' | 'edit'
@@ -324,10 +359,13 @@ const draftFallbackEnabledId = createId()
 const draftMuteInputId = createId()
 const typeLabelId = createId()
 const sourceModeLabelId = createId()
+const playbackModeLabelId = createId()
+const playbackModeNoteId = createId()
 
 const urlInput = ref('')
 const draftType = ref<AssetType>('image')
 const draftSourceMode = ref<DraftSourceMode>('file')
+const draftPlaybackMode = ref<PlaylistItemPlaybackMode>('auto')
 const urlDuration = ref<number | null>(null)
 const draftAssets = ref<PickedAsset[]>([])
 const draftFallback = ref<string | null>(null)
@@ -347,6 +385,31 @@ const sourceModeOptions: Array<{ label: string; value: DraftSourceMode }> = [
   { label: 'ファイル', value: 'file' },
   { label: 'URL', value: 'url' }
 ]
+
+const autoPlaybackModeLabel = computed(() =>
+  draftType.value === 'video' ? '動画尺' : '既定秒'
+)
+const playbackModeOptions = computed<
+  Array<{ label: string; value: PlaylistItemPlaybackMode }>
+>(() => [
+  { label: autoPlaybackModeLabel.value, value: 'auto' },
+  { label: '秒数指定', value: 'duration' },
+  { label: '無期限', value: 'forever' }
+])
+const draftDurationMin = computed(() => (draftType.value === 'video' ? 1 : 2))
+const playbackModeNote = computed(() => {
+  if (draftPlaybackMode.value === 'forever') {
+    return 'この項目に到達すると次へ進まず、表示し続けます。'
+  }
+
+  if (draftPlaybackMode.value === 'duration') {
+    return '指定した秒数で次の項目へ進みます。'
+  }
+
+  return draftType.value === 'video'
+    ? '動画の終了時に次の項目へ進みます。'
+    : `プレイリスト既定の ${props.defaultDurationSec} 秒で次の項目へ進みます。`
+})
 
 const singleItemMode = computed(() => props.maxItems === 1)
 const singleDraftSelectionMode = computed(
@@ -401,7 +464,13 @@ const itemIcon = (type: AssetType) =>
 const timelineIndexLabel = (index: number) => String(index + 1).padStart(2, '0')
 
 const playbackMetaLabel = (item: PlaylistItem) => {
-  if (typeof item.durationSec === 'number') {
+  const playbackMode = getItemPlaybackMode(item)
+
+  if (playbackMode === 'forever') {
+    return '無期限'
+  }
+
+  if (playbackMode === 'duration' && typeof item.durationSec === 'number') {
     return `${item.durationSec} 秒`
   }
 
@@ -433,6 +502,7 @@ const openEditDialog = (index: number) => {
   dialogMode.value = 'edit'
   editingItemIndex.value = index
   draftType.value = item.type
+  draftPlaybackMode.value = getItemPlaybackMode(item)
   urlDuration.value = item.durationSec ?? null
   draftFallback.value = item.fallbackSrc ?? null
   draftFallbackEnabled.value = Boolean(item.fallbackSrc)
@@ -467,40 +537,53 @@ const closeDraftDialog = () => {
   resetDraft()
 }
 
+/** Returns the persisted duration only when the draft explicitly uses seconds. */
 const normalizeDuration = (
+  playbackMode: PlaylistItemPlaybackMode,
   type: AssetType,
   value: number | null | undefined
 ): number | undefined => {
-  if (type === 'video' && (value === null || value === undefined)) {
+  if (playbackMode !== 'duration') {
     return undefined
   }
 
   if (typeof value === 'number' && Number.isFinite(value)) {
-    return value
+    return clampNumber(value, type === 'video' ? 1 : 2, 36000)
   }
 
-  return type === 'video' ? undefined : props.defaultDurationSec
+  return clampNumber(props.defaultDurationSec, type === 'video' ? 1 : 2, 36000)
 }
 
-/** Fills an empty image/web duration after the input loses focus. */
+/** Fills an empty duration after the explicit duration input loses focus. */
 const commitDraftDuration = () => {
-  if (draftType.value === 'video' || urlDuration.value !== null) {
+  if (draftPlaybackMode.value !== 'duration' || urlDuration.value !== null) {
     return
   }
 
   urlDuration.value = props.defaultDurationSec
 }
 
+/** Builds playback fields from the current draft state. */
+const buildPlaybackFields = (type: AssetType) => ({
+  playbackMode: draftPlaybackMode.value,
+  durationSec: normalizeDuration(
+    draftPlaybackMode.value,
+    type,
+    urlDuration.value
+  )
+})
+
 const buildItem = (asset: PickedAsset): PlaylistItem => ({
   id: createId(),
   type: asset.type,
   src: asset.path,
-  durationSec: normalizeDuration(asset.type, urlDuration.value),
+  ...buildPlaybackFields(asset.type),
   mute: asset.type === 'video' ? draftMute.value : false
 })
 
 const resetDraft = () => {
   urlInput.value = ''
+  draftPlaybackMode.value = 'auto'
   urlDuration.value = null
   draftAssets.value = []
   draftFallback.value = null
@@ -550,6 +633,21 @@ const handleDraftSourceModeChange = (
   }
 
   draftSourceMode.value = sourceMode
+}
+
+/** Updates the draft playback mode and seeds a usable seconds value when needed. */
+const handleDraftPlaybackModeChange = (
+  playbackMode: PlaylistItemPlaybackMode | null | undefined
+) => {
+  if (!playbackMode) {
+    return
+  }
+
+  draftPlaybackMode.value = normalizePlaylistItemPlaybackMode(playbackMode)
+
+  if (draftPlaybackMode.value === 'duration' && urlDuration.value === null) {
+    urlDuration.value = props.defaultDurationSec
+  }
 }
 
 const pickDraftFiles = async () => {
@@ -619,7 +717,7 @@ const addDraft = async (): Promise<boolean> => {
         type: draftType.value,
         src,
         originUrl,
-        durationSec: normalizeDuration(draftType.value, urlDuration.value),
+        ...buildPlaybackFields(draftType.value),
         fallbackSrc:
           draftType.value === 'web' && draftFallbackEnabled.value
             ? (draftFallback.value ?? undefined)
@@ -662,10 +760,7 @@ const editDraft = async (): Promise<boolean> => {
               id: current.id,
               type: draftType.value,
               src: asset.path,
-              durationSec: normalizeDuration(
-                draftType.value,
-                urlDuration.value
-              ),
+              ...buildPlaybackFields(draftType.value),
               fallbackSrc:
                 draftType.value === 'web' && draftFallbackEnabled.value
                   ? (draftFallback.value ?? undefined)
@@ -700,7 +795,7 @@ const editDraft = async (): Promise<boolean> => {
             type: draftType.value,
             src,
             originUrl,
-            durationSec: normalizeDuration(draftType.value, urlDuration.value),
+            ...buildPlaybackFields(draftType.value),
             fallbackSrc:
               draftType.value === 'web' && draftFallbackEnabled.value
                 ? (draftFallback.value ?? undefined)
@@ -990,6 +1085,10 @@ const removeItem = (index: number) => {
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
+
+  :where(.p-tag) {
+    flex: 0 0 auto;
+  }
 
   strong {
     min-width: 0;

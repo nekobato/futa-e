@@ -5,6 +5,7 @@ import type {
   PlaylistConfig,
   PlaylistItem
 } from './types'
+import { getItemPlaybackMode, isPlaylistItemPlaybackMode } from './playback'
 import { clampNumber, createId, isRecord } from './utils'
 
 /**
@@ -93,13 +94,21 @@ const normalizeItem = (item: unknown): PlaylistItem | null => {
   const durationSec = durationRaw
     ? clampNumber(durationRaw, 1, 36000)
     : undefined
+  const explicitPlaybackMode = isPlaylistItemPlaybackMode(item.playbackMode)
+    ? item.playbackMode
+    : undefined
+  const playbackMode =
+    explicitPlaybackMode === 'duration' && durationSec === undefined
+      ? 'auto'
+      : (explicitPlaybackMode ?? getItemPlaybackMode({ durationSec }))
 
   return {
     id: typeof item.id === 'string' ? item.id : createId(),
     type,
     src,
     originUrl: typeof item.originUrl === 'string' ? item.originUrl : undefined,
-    durationSec,
+    playbackMode,
+    durationSec: playbackMode === 'duration' ? durationSec : undefined,
     fallbackSrc:
       typeof item.fallbackSrc === 'string' ? item.fallbackSrc : undefined,
     mute: typeof item.mute === 'boolean' ? item.mute : false
