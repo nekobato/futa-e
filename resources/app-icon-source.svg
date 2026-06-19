@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="224" fill="#fff3e5" />
+  <path
+    d="M206 256c0-43 35-78 78-78h456c43 0 78 35 78 78v292c0 43-35 78-78 78H284c-43 0-78-35-78-78V256Z"
+    fill="#30283e"
+  />
+  <rect x="258" y="230" width="508" height="34" rx="17" fill="#ff9fc6" />
+  <rect x="254" y="260" width="516" height="324" rx="48" fill="#74dcd0" />
+  <path d="M254 411h516v173H254V411Z" fill="#ffe18a" />
+  <path
+    d="M254 466c74-40 144-39 208 4 78 53 141 50 211-12 34-30 66-48 97-55v181H254V466Z"
+    fill="#f79aba"
+  />
+  <path
+    d="M330 360c16-28 50-43 84-35 16 4 30 13 41 25 20-18 48-26 76-19 32 8 56 33 63 64 15-7 33-9 50-5 45 11 73 56 63 101H315c-8-46-3-91 15-131Z"
+    fill="#fff8f2"
+  />
+  <ellipse cx="512" cy="474" rx="91" ry="86" fill="#ffe0dc" />
+  <path
+    d="M406 437c20-55 65-86 106-86 45 0 86 33 105 86-26-18-52-27-79-28-7 25-28 43-54 43-22 0-42-13-52-33-9 2-18 8-26 18Z"
+    fill="#6f5a90"
+  />
+  <circle cx="479" cy="482" r="9" fill="#30283e" />
+  <circle cx="545" cy="482" r="9" fill="#30283e" />
+  <path
+    d="M492 520c13 10 27 10 40 0"
+    fill="none"
+    stroke="#30283e"
+    stroke-width="12"
+    stroke-linecap="round"
+  />
+  <path d="M391 390l-48-18 24 45-41 29 52 3 16 49 19-48 52-1-40-30 24-46-48 17Z" fill="#ff9fc6" />
+  <path d="M638 349l-29 11 27 16-2 32 24-21 31 8-13-29 17-27-32 3-21-24-2 31Z" fill="#8de7dc" />
+  <text
+    x="512"
+    y="338"
+    text-anchor="middle"
+    font-family="Arial Rounded MT Bold, Avenir Next, sans-serif"
+    font-size="82"
+    font-weight="800"
+    letter-spacing="-2"
+    fill="#30283e"
+    transform="rotate(-4 512 338)"
+  >
+    Futa E
+  </text>
+  <path d="M464 626h96v66h-96z" fill="#30283e" />
+  <rect x="334" y="690" width="356" height="62" rx="31" fill="#30283e" />
+  <rect x="442" y="710" width="140" height="16" rx="8" fill="#ffe18a" />
+</svg>

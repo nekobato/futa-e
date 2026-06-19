@@ -1,7 +1,17 @@
 <template>
   <div class="control-layout">
     <header class="control-pagebar">
-      <h1 class="control-pagebar-title">Futa E</h1>
+      <div class="control-pagebar-brand">
+        <img
+          class="control-pagebar-logo"
+          src="/futa-e-logo.png"
+          alt=""
+          aria-hidden="true"
+          width="56"
+          height="56"
+        />
+        <h1 class="control-pagebar-title">Futa E</h1>
+      </div>
       <div class="control-pagebar-actions">
         <Button
           class="control-pagebar-button"
@@ -196,6 +206,20 @@ const handleStartPlayer = async () => {
     align-items: center;
     gap: 20px;
     padding: 0 10px;
+
+    .control-pagebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .control-pagebar-logo {
+      width: 56px;
+      height: 56px;
+      flex: 0 0 56px;
+      display: block;
+    }
 
     &-title {
       margin: 0;
