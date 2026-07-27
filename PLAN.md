@@ -1,11 +1,30 @@
-以下は、これまでの議論を踏まえた **Futa-e V1 実装計画**ですわ。
-細部は意図的に“雑にしてよい”前提で、**思想（設計原則）と意図（なぜそう分けるか／何を守るか）**を中心に、実装が迷子にならない骨格を先に固めます。
+# Futa-e V1 実装計画
 
----
+最終同期日: 2026-07-15
+
+## 現在地
+
+Apple Silicon Mac向けのローカルPlayerはv0.0.3まで公開済みである。
+複数DisplayへのKiosk表示、画像と動画とWebの再生、複数Playlist、Display別設定、Safe Mode、基本Watchdog、deep link、署名と公証を実装している。
+現在の作業ツリーではREADME、インストール、操作、既知の制約、実装状況の同期を進めているが、LICENSEはまだ存在しない。
+このリポジトリの実装対象はローカルPlayerとし、Cloudは別リポジトリの長期構想として扱う。
+
+## 次に行うこと
+
+- [ ] READMEが参照するLICENSEを追加し、ライセンス方針を`package.json`と文書へ反映する。
+- [ ] 現HEADで`lint`、`typecheck`、`test`、application buildを実行し、v0.0.3のartifactとの対応を記録する。
+- [ ] 複数Display、offline、fallback、Safe Mode、Watchdog、Kiosk終了、deep linkを実機で確認する。
+- [ ] rendererからabsolute pathを扱うlocal media bridgeと、Web contentを表示する`iframe`のsandboxとCSPをsecurity reviewする。
+- [ ] remote cacheのContent-Type、hash、整合性、容量上限、重複排除、削除方針を決める。
+- [ ] 段階的Watchdog、Display hot-plug時の再配置、OSログイン時の自動起動、再起動後のKiosk復帰を実装する。
+- [ ] application CIへfrozen install、lint、typecheck、test、buildを追加する。
+- [ ] Manifest v1 JSON SchemaとDevice Protocol v1をこのリポジトリで扱う範囲を決める。
+- [ ] Windows、Linux、Intel Macを対応範囲に含めるか決める。
 
 # 0. リポジトリのスコープ
 
-本リポジトリは OSS として公開する **Futa-e** 専用です。**Futa-e Cloud** は別リポジトリ（非公開）で実装・運用する前提とし、本計画内の Cloud 記述は概念整理に留めますの。
+本リポジトリはOSSとして公開する**Futa-e**専用である。
+**Futa-e Cloud**は別リポジトリで実装し、本計画内のCloud記述は概念整理に留める。
 
 # 1. V1 の定義
 
@@ -29,17 +48,17 @@
 
 ---
 
-# 2. 思想と意図（ここが背骨ですわ）
+# 2. 設計原則
 
 ## 2.1 ローカルファーストの徹底
 
-**Player は、Cloud がなくても成立する**。これが信用の根でございます。
+**PlayerはCloudがなくても成立する**ことを原則とする。
 
 - 端末がネット不調でも表示は続く（展示の現場で最重要）
 - “無料/OSS”を本気で成立させるには、Cloud への依存を断ち切る必要がある
 - その上で、Cloud は「便利・統制・保守」を売る（後述）
 
-> 意図：無料版を“お試し”にしない。無料版を“完成品の別モード”にすることで、採用が進み、結果として有料が自然に必要になる導線を作りますの。
+> 意図：無料版を試用版に限定せず、Cloudを必要としない運用を完成させる。
 
 ## 2.2 Contract-first：Manifest を唯一の契約にする
 
@@ -49,7 +68,7 @@
 - リモート：Cloud が manifest を生成して配る
 
 > 意図：Cloud を後から作っても Player を作り直さない。
-> “何を表示するか”の契約が固定されていれば、配布方法（ローカル/クラウド）は交換可能になりますわ。
+> 表示内容の契約を固定し、ローカルとCloudの配布方法を交換可能にする。
 
 ## 2.3 コントロールプレーンとデータプレーンの分離
 
@@ -57,7 +76,7 @@
 - **データプレーン（R2 + CDN）**：manifest と素材を“静的”に配る
 
 > 意図：
-> 端末が増えるほど、DB を叩かせると死にます。端末は静的配布物（manifest）を取りに行くだけ、イベントは非同期で流すだけ、に寄せますの。
+> 端末数が増えてもDB負荷が比例しないように、端末は静的なmanifestを取得し、eventは非同期処理へ送る。
 > また R2 はエグレス帯域課金が無い方針が明記されており、配信コストを読みやすくできます。 ([Cloudflare Docs][1])
 
 ## 2.4 Failure-first：落ちないより“戻る”
@@ -69,7 +88,7 @@
 - オフラインキャッシュ（ネットが切れても継続）
 - Publish の原子性（新セットが揃うまで切替しない）
 
-> 意図：Electron/ネイティブ論争に巻き込まれないための本質解ですわ。実装技術は揺らいでも、“復旧の階段”が設計に残ります。
+> 実装技術を変更しても、段階的な復旧手順を維持できる設計にする。
 
 ## 2.5 Cloud は「他人の表示を安全に触れる」ことを売る
 
@@ -80,7 +99,7 @@
 - 承認・監査（誰がいつ変えたか）
 
 > 意図：
-> “編集できる自由”ではなく、“事故らない自由”を提供する。組織でお金が出る理由はここにありますの。
+> 編集範囲を権限で限定し、組織運用の誤操作を防ぐ。
 
 ---
 
@@ -113,17 +132,16 @@
 
 # 4. 実装計画（フェーズと成果物）
 
-時間見積もりではなく、**依存関係と“完成の判定条件”**で区切りますわ。
+時間見積もりではなく、依存関係と完了条件で区切る。
 
 ## Phase 0：リポジトリと作法を先に決める
 
 ### 成果物
 
-- 単一リポジトリ雛形（`apps/player` 相当をリポジトリルートに昇格）
-- manifest schema（Player で参照する JSON Schema。Cloud 側は別リポジトリで同一仕様を参照）
-- shared 定義（型、エラーコード、ログ形式。Player リポジトリ内に最小限で保持）
-- CI（lint/test/build、署名付きリリースの土台）
-- ライセンス方針（Player OSS / Cloud closed）を README に明記
+- [ ] manifest schema（Player で参照する JSON Schema。Cloud 側は別リポジトリで同一仕様を参照）
+- [ ] shared 定義の完成（型と IPC は実装済み。共通エラーコードとログ形式は未定義）
+- [ ] Player の CI（現行 CI は Web 背景カタログの build / deploy のみ）
+- [ ] ライセンス方針の確定と README / `package.json` への反映
 
 ### 判定条件
 
@@ -136,7 +154,7 @@
 
 ### 思想
 
-ここが揺れると、後工程が全部やり直しになります。先に固める価値が最大ですの。
+この契約を先に固定し、後工程の手戻りを抑える。
 
 ### 成果物
 
@@ -166,31 +184,24 @@
 
 ### 思想
 
-V1 の信用は Player の安定性で決まります。Cloud は後でも売れますが、Player が弱いと信用は積み上がりませんの。
+V1ではPlayerの安定性をCloud実装より先に固める。
 
 ### 機能（必須）
 
-- マルチディスプレイに全画面表示（サイネージ前提）
-- playlist 再生（image/video/web）
-- オフラインキャッシュ（素材）
-- Watchdog（レンダラ無応答/読み込み失敗 → 段階的復旧）
-- Safe Mode（最後の砦の静止画）
-- ローカル GUI（最低限）
-
-  - フォルダ指定（画像/動画）
-  - URL 指定（Web）
-  - playlist 編集（最低限）
+- [ ] オフラインキャッシュ（URL に拡張子がある image/video の追加時キャッシュのみ実装済み。Content-Type / hash / 整合性検証、上限、掃除、重複排除は未実装）
+- [ ] Watchdog（renderer の heartbeat、無応答、停止時の reload は実装済み。段階的復旧は未実装）
+- [ ] フォルダ単位の画像・動画取り込み
 
 ### 機能（任意だが早期に効く）
 
-- “Privacy lid”の即時トグル（ホットキー）
-- “Decor”用のテーマ/遷移（後回しでもよい）
+- [ ] “Privacy lid”の即時トグル（ホットキー）
+- [ ] “Decor”用のテーマ/遷移
 
 ### 判定条件（サイネージとしての DoD）
 
-- ネット切断 → 再接続でも表示が継続・復帰する
-- Web が落ちる/遅い →fallback に落ちる
-- 端末再起動 → 自動で展示状態に戻せる（OS の自動起動設定含む）
+- [ ] ネット切断 → 再接続でも表示が継続・復帰する（キャッシュ済み画像・動画に限り継続可能）
+- [ ] Web が落ちる/遅い → fallback に落ちる（item が切り替わる前に timeout へ到達した場合の fallback のみ実装済み。HTTP エラーや埋め込み拒否は検出できない）
+- [ ] 端末再起動 → 自動で展示状態に戻せる（OS の自動起動設定を含む）
 
 ---
 
@@ -198,7 +209,7 @@ V1 の信用は Player の安定性で決まります。Cloud は後でも売れ
 
 ### 思想
 
-V1 の Cloud は「配布の置き場」ではなく、**“誰がどこを触れるか”を保証する装置**にしますの。
+V1のCloudは配布場所だけでなく、操作可能な範囲を権限で保証する。
 
 ### 成果物（コア）
 
@@ -277,7 +288,7 @@ V1.1〜として、売上に直結する順に積みます。
 
 ### 思想
 
-Cloud が伸びると「Windows 端末で店頭」が必ず出ます。ここで Player の抽象化が効きますの。
+Windows対応では、PlayerのOS依存部分をadapterへ分離する。
 
 ### 実装方針
 
@@ -334,13 +345,11 @@ Workers Analytics Engine は保持 3 ヶ月。 ([Cloudflare Docs][11])
 
 ## 6.2 Player（macOS）
 
-- [ ] Display manager（モニタ列挙 → ウィンドウ生成 → 復帰）
-- [ ] Asset loaders（image/video/web）
-- [ ] Playlist engine（tick、遷移、ループ、エラー処理）
-- [ ] Cache manager（ダウンロード、検証、掃除）
-- [ ] Watchdog（renderer health、タイムアウト、Safe Mode）
-- [ ] Local UI（最低限の編集と起動）
-- [ ] Packaging（自動起動、アップデートは後回し可）
+- [ ] Display manager（モニタ列挙と Kiosk window 生成は実装済み。hot-plug 復帰は未実装）
+- [ ] Cache manager（image/video の HTTP status を確認したダウンロードのみ実装済み。Content-Type / hash / 整合性検証、上限、重複排除、掃除は未実装）
+- [ ] Watchdog（renderer health と reload は実装済み。段階的復旧と native fallback は未実装）
+- [ ] OS ログイン時の自動起動
+- [ ] アプリ内自動更新
 
 ## 6.3 Cloud（Workers + D1 + R2）
 
@@ -360,23 +369,21 @@ Workers Analytics Engine は保持 3 ヶ月。 ([Cloudflare Docs][11])
 
 # 7. 仕上げの判定（V1 としての“成立条件”）
 
-- **ローカル単体で展示運用できる**（Player が無料でも“使い物”）
-- **Cloud は「ルーム + 権限」で他人の表示を安全に変えられる**
-- **端末が増えても、端末側は静的配布物を取りに行くだけ**（DB 直叩きしない）
-- **障害が起きても、絵が消えない**（Safe Mode が最後に残る）
+- [ ] **ローカル単体で展示運用できる**（基本再生は可能。自動起動、完全な offline、hot-plug 復帰が未完了）
+- [ ] **Cloud は「ルーム + 権限」で他人の表示を安全に変えられる**（別リポジトリの対象）
+- [ ] **端末が増えても、端末側は静的配布物を取りに行くだけ**（Cloud 未実装）
+- [ ] **障害が起きても、絵が消えない**（renderer crash-loop を含む最後の砦は未実装）
 
 ---
 
-必要なら、この計画をそのまま GitHub 用に **`docs/architecture.md` と `docs/roadmap.md`** に整形し、Issue テンプレ（Design/Player/Cloud）まで落として“実装に着手できる状態”へ磨けますわ。
-
-[1]: https://developers.cloudflare.com/r2/pricing/?utm_source=chatgpt.com "R2 pricing"
-[2]: https://developers.cloudflare.com/pages/framework-guides/deploy-a-nuxt-site/?utm_source=chatgpt.com "Nuxt · Cloudflare Pages docs"
-[3]: https://nuxt.com/deploy/cloudflare?utm_source=chatgpt.com "Deploy Nuxt to Cloudflare"
-[4]: https://developers.cloudflare.com/d1/platform/limits/?utm_source=chatgpt.com "Limits · Cloudflare D1 docs"
-[5]: https://developers.cloudflare.com/kv/concepts/how-kv-works/?utm_source=chatgpt.com "How KV works · Cloudflare Workers KV docs"
-[6]: https://developers.cloudflare.com/queues/reference/delivery-guarantees/?utm_source=chatgpt.com "Delivery guarantees - Queues"
-[7]: https://developers.cloudflare.com/durable-objects/best-practices/websockets/?utm_source=chatgpt.com "Use WebSockets · Cloudflare Durable Objects docs"
-[8]: https://developers.cloudflare.com/analytics/analytics-engine/?utm_source=chatgpt.com "Workers Analytics Engine"
-[9]: https://developers.cloudflare.com/workers/configuration/cron-triggers/?utm_source=chatgpt.com "Cron Triggers - Workers"
-[10]: https://nitro.build/deploy/providers/cloudflare?utm_source=chatgpt.com "Cloudflare"
-[11]: https://developers.cloudflare.com/analytics/analytics-engine/limits/?utm_source=chatgpt.com "Workers Analytics Engine — Limits"
+[1]: https://developers.cloudflare.com/r2/pricing/?utm_source=chatgpt.com 'R2 pricing'
+[2]: https://developers.cloudflare.com/pages/framework-guides/deploy-a-nuxt-site/?utm_source=chatgpt.com 'Nuxt · Cloudflare Pages docs'
+[3]: https://nuxt.com/deploy/cloudflare?utm_source=chatgpt.com 'Deploy Nuxt to Cloudflare'
+[4]: https://developers.cloudflare.com/d1/platform/limits/?utm_source=chatgpt.com 'Limits · Cloudflare D1 docs'
+[5]: https://developers.cloudflare.com/kv/concepts/how-kv-works/?utm_source=chatgpt.com 'How KV works · Cloudflare Workers KV docs'
+[6]: https://developers.cloudflare.com/queues/reference/delivery-guarantees/?utm_source=chatgpt.com 'Delivery guarantees - Queues'
+[7]: https://developers.cloudflare.com/durable-objects/best-practices/websockets/?utm_source=chatgpt.com 'Use WebSockets · Cloudflare Durable Objects docs'
+[8]: https://developers.cloudflare.com/analytics/analytics-engine/?utm_source=chatgpt.com 'Workers Analytics Engine'
+[9]: https://developers.cloudflare.com/workers/configuration/cron-triggers/?utm_source=chatgpt.com 'Cron Triggers - Workers'
+[10]: https://nitro.build/deploy/providers/cloudflare?utm_source=chatgpt.com 'Cloudflare'
+[11]: https://developers.cloudflare.com/analytics/analytics-engine/limits/?utm_source=chatgpt.com 'Workers Analytics Engine — Limits'

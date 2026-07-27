@@ -4,9 +4,7 @@ import type { PlaylistItem, PlaylistItemPlaybackMode } from './types'
  * Describes how the player should leave the current item.
  */
 export type PlaybackAdvancePolicy =
-  | { type: 'hold' }
-  | { type: 'media-end' }
-  | { type: 'timer'; delayMs: number }
+  { type: 'hold' } | { type: 'media-end' } | { type: 'timer'; delayMs: number }
 
 /** Checks whether a raw value is a supported playlist item playback mode. */
 export const isPlaylistItemPlaybackMode = (

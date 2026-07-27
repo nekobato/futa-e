@@ -10,7 +10,7 @@
 - ローカル環境だけで蓋絵プレイヤーとして動作できること
 - 画像、動画、Web を playlist として再生できること
 - 複数モニター環境で、まずは同一表示、その後に個別設定へ拡張できること
-- 再生内容と表示時間を playlist として管理し、将来複数 playlist を持てること
+- 再生内容と表示時間を複数の playlist として管理できること
 
 ## 再生対象
 
@@ -24,6 +24,7 @@ playlist item は少なくとも次の情報を持つ。
 - `type`
 - `src`
 - `originUrl`
+- `playbackMode`
 - `durationSec`
 - `fallbackSrc`
 - `mute`
@@ -34,30 +35,34 @@ playlist item は少なくとも次の情報を持つ。
 - `shuffle` が無効なら定義順に再生する
 - `shuffle` が有効なら 1 周のあいだ重複なしで再生する
 - `shuffle` の 1 周が終わったら、同じ方法で再度シャッフルし直す
-- `image` と `web` は `durationSec` を使って切り替える
-- `durationSec` がない場合は `defaultDurationSec` を使う
-- `video` は自然終了で次へ進む
-- `video` に `durationSec` がある場合は、その秒数で打ち切って次へ進んでよい
+- `playbackMode = auto` の `image` と `web` は `defaultDurationSec` で切り替える
+- `playbackMode = auto` の `video` は自然終了で次へ進む
+- `playbackMode = duration` は `durationSec` で次へ進む
+- `playbackMode = duration` の `video` が指定秒数より先に終了した場合は、自然終了時に次へ進む
+- `playbackMode = forever` は次へ進まない。`video` はループ再生する
 - `mute` は item 単位の ON/OFF のみを持つ
 - 音量値そのものは OS または PC 側に任せる
 
 ## Web の扱い
 
 - `web` には `webTimeoutSec` を適用する
-- 指定時間内に表示準備が整わない場合は fallback 表示へ切り替える
+- item が切り替わる前に指定時間へ到達し、表示準備が整っていない場合は fallback 表示へ切り替える
 - fallback 表示中も playlist の時間は進める
 - `fallbackSrc` がない場合は Safe Mode 用の既定画像を使う
 
 ## media error の扱い
 
-- 画像、動画、Web の各 item でエラーが起きた場合は即座に skip する
-- 自動再試行はしない
-- 再生可能な item がなくなった場合のみ Safe Mode に入る
+- 画像と動画の検出可能なエラーは、該当 item を即座に skip する
+- 画像と動画は自動再試行しない
+- Web は読込 timeout 時に fallback を表示し、item 自体は skip しない
+- Web の HTTP エラーや埋め込み拒否は確実に検出できない
+- playlist の全 item が画像または動画で、すべて再生不能になった場合は Safe Mode に入る
 
 ## Safe Mode
 
 - playlist が空の場合は Safe Mode に入る
-- 全 item が再生不能で表示継続できない場合は Safe Mode に入る
+- 検出可能な画像・動画エラーにより全 item が再生不能になった場合は Safe Mode に入る
+- `loop = false` の playlist が最後まで完了した場合は Safe Mode に入る
 - Safe Mode は「最低限、何かが表示されている状態」を守るための最後の砦とする
 - Watchdog の細かい段階復旧や自動回復条件は、当面は厳密に定義しない
 
@@ -65,8 +70,8 @@ playlist item は少なくとも次の情報を持つ。
 
 - 初期状態では、存在する全モニターに同一内容を表示する
 - 各 playlist に `モニターを個別に設定する` の ToggleSwitch を用意する
-- 先頭の playlist の ToggleSwitch が OFF の場合は共通設定のみを使う
-- 先頭の playlist の ToggleSwitch が ON の場合は、現在存在するモニター一覧を取得し、各モニターごとに設定項目を表示する
+- 再生対象 playlist の ToggleSwitch が OFF の場合は共通設定のみを使う
+- 再生対象 playlist の ToggleSwitch が ON の場合は、現在存在するモニター一覧を取得し、各モニターごとに設定項目を表示する
 - モニターごとの識別子には `Electron.Display.id` を使う
 - 個別設定が存在しないモニターは共通設定へフォールバックする
 
@@ -80,6 +85,7 @@ type PlaylistItem = {
   type: 'image' | 'video' | 'web'
   src: string
   originUrl?: string
+  playbackMode?: 'auto' | 'duration' | 'forever'
   durationSec?: number
   fallbackSrc?: string
   mute?: boolean
@@ -110,16 +116,17 @@ type DisplayConfig = {
 }
 ```
 
-- 先頭の playlist の `perDisplay = false` なら全モニターで共通設定を使う
-- 先頭の playlist の `perDisplay = true` なら `displays` の設定を優先する
+- `activePlaylistId` の playlist の `perDisplay = false` なら全モニターで共通設定を使う
+- `activePlaylistId` の playlist の `perDisplay = true` なら `displays` の設定を優先する
 - ローカル保存ファイルには `cloud` object を持たせない
 - 将来 Cloud 連携を追加する場合も、取得データは API から供給し、ローカル設定仕様へ常設しない
-- 現在の UI は先頭の playlist を編集対象にする
+- 現在の UI は一覧で選択した playlist を編集し、`activePlaylistId` の playlist を再生対象にする
 - 将来 Manifest を定義する場合も、このローカル設定との差分が小さくなるように寄せる
 
 ## cache と offline
 
-- リモートの `image` と `video` は、可能ならローカル cache へ保存してよい
+- URL path に拡張子があるリモートの `image` と `video` は、追加時にローカル cache へ保存する
+- `web` は cache しない
 - cache の上限容量は当面設けない
 - cache の自動掃除はしない
 - cache が作れない場合は、可能なら元の URL をそのまま使う
@@ -127,14 +134,15 @@ type DisplayConfig = {
 
 ## item 単位編集
 
-playlist に追加済みの item ごとに、将来的には次の編集をできるようにしてよい。
+playlist に追加済みの item ごとに、次の項目を編集できる。
 
 - `durationSec`
 - `fallbackSrc`
 - `mute`
 - `src`
+- `playbackMode`
 
-ただし初期段階では、追加、並び替え、削除だけでも成立する。
+追加、並び替え、削除にも対応する。
 
 ## 当面の対象外
 
