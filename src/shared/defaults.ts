@@ -83,7 +83,9 @@ const normalizeItem = (item: unknown): PlaylistItem | null => {
   }
 
   const type = isAssetType(item.type) ? item.type : null
-  const src = typeof item.src === 'string' ? item.src : ''
+  const legacyOriginUrl =
+    typeof item.originUrl === 'string' ? item.originUrl : ''
+  const src = legacyOriginUrl || (typeof item.src === 'string' ? item.src : '')
 
   if (!type || !src) {
     return null
@@ -106,11 +108,14 @@ const normalizeItem = (item: unknown): PlaylistItem | null => {
     id: typeof item.id === 'string' ? item.id : createId(),
     type,
     src,
-    originUrl: typeof item.originUrl === 'string' ? item.originUrl : undefined,
+    sourceName:
+      typeof item.sourceName === 'string' ? item.sourceName : undefined,
     playbackMode,
     durationSec: playbackMode === 'duration' ? durationSec : undefined,
     fallbackSrc:
       typeof item.fallbackSrc === 'string' ? item.fallbackSrc : undefined,
+    fallbackName:
+      typeof item.fallbackName === 'string' ? item.fallbackName : undefined,
     mute: typeof item.mute === 'boolean' ? item.mute : false
   }
 }

@@ -9,10 +9,11 @@ export type PlaylistItem = {
   id: string
   type: AssetType
   src: string
-  originUrl?: string
+  sourceName?: string
   playbackMode?: PlaylistItemPlaybackMode
   durationSec?: number
   fallbackSrc?: string
+  fallbackName?: string
   mute?: boolean
 }
 
@@ -41,14 +42,9 @@ export type PlayerStatus = {
 }
 
 export type PickedAsset = {
-  path: string
+  id: string
   type: AssetType
-  name?: string
-}
-
-export type CacheResult = {
-  localPath: string
-  originalUrl: string
+  name: string
 }
 
 export type DisplayBounds = {

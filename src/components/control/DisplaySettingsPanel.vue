@@ -68,7 +68,7 @@ const displayEnabledInputId = (displayId: string) =>
 
 /** Resolves the current enabled state for a display. */
 const isDisplayEnabled = (displayId: string) =>
-  props.displays[displayId]?.enabled ?? true
+  props.displays[displayId]?.enabled ?? false
 
 /** Reads the checked state from a PrimeVue toggle change event. */
 const toggleSwitchChecked = (event: Event): boolean =>

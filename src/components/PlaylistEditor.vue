@@ -157,10 +157,28 @@
           <InputText
             :id="urlInputId"
             v-model="urlInput"
+            type="url"
+            inputmode="url"
             size="small"
             placeholder="https://example.com/asset"
             class="w-full"
+            :aria-describedby="
+              draftType === 'web' ? webUrlDescriptionIds : undefined
+            "
+            :aria-invalid="showWebUrlError ? 'true' : undefined"
+            @blur="urlInputTouched = true"
           />
+          <p v-if="draftType === 'web'" :id="webUrlHintId" class="surface-note">
+            Web URL には https:// で始まる URL を入力してください。
+          </p>
+          <p
+            v-if="showWebUrlError"
+            :id="webUrlErrorId"
+            class="validation-error"
+            role="alert"
+          >
+            有効な HTTPS URL を入力してください。
+          </p>
         </div>
 
         <div v-else class="field-inline">
@@ -321,7 +339,13 @@ import type {
   PlaylistItem,
   PlaylistItemPlaybackMode
 } from '../shared/types'
-import { clampNumber, createId, titleFromPath } from '../shared/utils'
+import {
+  clampNumber,
+  createId,
+  isAllowedWebUrl,
+  isDirectMediaUrl,
+  titleFromPath
+} from '../shared/utils'
 
 type DraftSourceMode = 'file' | 'url'
 type ItemDialogMode = 'add' | 'edit'
@@ -361,14 +385,18 @@ const typeLabelId = createId()
 const sourceModeLabelId = createId()
 const playbackModeLabelId = createId()
 const playbackModeNoteId = createId()
+const webUrlHintId = createId()
+const webUrlErrorId = createId()
 
 const urlInput = ref('')
+const urlInputTouched = ref(false)
 const draftType = ref<AssetType>('image')
 const draftSourceMode = ref<DraftSourceMode>('file')
 const draftPlaybackMode = ref<PlaylistItemPlaybackMode>('auto')
 const urlDuration = ref<number | null>(null)
 const draftAssets = ref<PickedAsset[]>([])
 const draftFallback = ref<string | null>(null)
+const draftFallbackName = ref<string | null>(null)
 const draftFallbackEnabled = ref(false)
 const draftMute = ref(false)
 const dialogMode = ref<ItemDialogMode>('add')
@@ -450,11 +478,27 @@ const timelineEntries = computed<PlaylistTimelineEntry[]>(() =>
   }))
 )
 const draftFallbackLabel = computed(() =>
-  fallbackLabel(draftFallback.value ?? undefined)
+  fallbackLabel(
+    draftFallback.value ?? undefined,
+    draftFallbackName.value ?? undefined
+  )
+)
+const isDraftWebUrlValid = computed(
+  () => draftType.value !== 'web' || isAllowedWebUrl(urlInput.value)
+)
+const showWebUrlError = computed(
+  () =>
+    draftType.value === 'web' &&
+    urlInputTouched.value &&
+    urlInput.value.trim().length > 0 &&
+    !isDraftWebUrlValid.value
+)
+const webUrlDescriptionIds = computed(() =>
+  showWebUrlError.value ? `${webUrlHintId} ${webUrlErrorId}` : webUrlHintId
 )
 const canSubmitDraft = computed(() =>
   draftSourceMode.value === 'url'
-    ? urlInput.value.trim().length > 0
+    ? urlInput.value.trim().length > 0 && isDraftWebUrlValid.value
     : draftAssets.value.length > 0
 )
 
@@ -499,12 +543,14 @@ const openEditDialog = (index: number) => {
     return
   }
 
+  urlInputTouched.value = false
   dialogMode.value = 'edit'
   editingItemIndex.value = index
   draftType.value = item.type
   draftPlaybackMode.value = getItemPlaybackMode(item)
   urlDuration.value = item.durationSec ?? null
   draftFallback.value = item.fallbackSrc ?? null
+  draftFallbackName.value = item.fallbackName ?? null
   draftFallbackEnabled.value = Boolean(item.fallbackSrc)
   draftMute.value = item.mute ?? false
 
@@ -512,18 +558,18 @@ const openEditDialog = (index: number) => {
     draftSourceMode.value = 'url'
     urlInput.value = item.src
     draftAssets.value = []
-  } else if (item.originUrl || item.src.startsWith('http')) {
+  } else if (isDirectMediaUrl(item.src)) {
     draftSourceMode.value = 'url'
-    urlInput.value = item.originUrl ?? item.src
+    urlInput.value = item.src
     draftAssets.value = []
   } else {
     draftSourceMode.value = 'file'
     urlInput.value = ''
     draftAssets.value = [
       {
-        path: item.src,
+        id: item.src,
         type: item.type,
-        name: titleFromPath(item.src)
+        name: item.sourceName ?? 'ローカル素材'
       }
     ]
   }
@@ -576,17 +622,20 @@ const buildPlaybackFields = (type: AssetType) => ({
 const buildItem = (asset: PickedAsset): PlaylistItem => ({
   id: createId(),
   type: asset.type,
-  src: asset.path,
+  src: asset.id,
+  sourceName: asset.name,
   ...buildPlaybackFields(asset.type),
   mute: asset.type === 'video' ? draftMute.value : false
 })
 
 const resetDraft = () => {
   urlInput.value = ''
+  urlInputTouched.value = false
   draftPlaybackMode.value = 'auto'
   urlDuration.value = null
   draftAssets.value = []
   draftFallback.value = null
+  draftFallbackName.value = null
   draftFallbackEnabled.value = false
   draftMute.value = false
   dialogMode.value = 'add'
@@ -606,6 +655,7 @@ const mergePlaylist = (items: PlaylistItem[]) => {
 
 const selectDraftType = (type: AssetType) => {
   draftType.value = type
+  urlInputTouched.value = false
   if (type === 'web') {
     draftSourceMode.value = 'url'
     draftAssets.value = []
@@ -669,6 +719,7 @@ const handleDraftFallbackToggle = (enabled: boolean) => {
   draftFallbackEnabled.value = enabled
   if (!enabled) {
     draftFallback.value = null
+    draftFallbackName.value = null
   }
 }
 
@@ -680,14 +731,16 @@ const pickDraftFallback = async () => {
   }
 
   draftFallbackEnabled.value = true
-  draftFallback.value = asset.path
+  draftFallback.value = asset.id
+  draftFallbackName.value = asset.name
 }
 
 const clearDraftFallback = () => {
   draftFallback.value = null
+  draftFallbackName.value = null
 }
 
-const addDraft = async (): Promise<boolean> => {
+const addDraft = (): boolean => {
   if (!canSubmitDraft.value) {
     return false
   }
@@ -699,15 +752,9 @@ const addDraft = async (): Promise<boolean> => {
   }
 
   const trimmed = urlInput.value.trim()
-  let src = trimmed
-  let originUrl: string | undefined
-
-  if (draftType.value !== 'web' && trimmed.startsWith('http')) {
-    const cached = await api.assets.cacheRemote(trimmed, draftType.value)
-    if (cached) {
-      src = cached.localPath
-      originUrl = cached.originalUrl
-    }
+  if (draftType.value === 'web' && !isAllowedWebUrl(trimmed)) {
+    urlInputTouched.value = true
+    return false
   }
 
   emitPlaylist(
@@ -715,12 +762,15 @@ const addDraft = async (): Promise<boolean> => {
       {
         id: createId(),
         type: draftType.value,
-        src,
-        originUrl,
+        src: trimmed,
         ...buildPlaybackFields(draftType.value),
         fallbackSrc:
           draftType.value === 'web' && draftFallbackEnabled.value
             ? (draftFallback.value ?? undefined)
+            : undefined,
+        fallbackName:
+          draftType.value === 'web' && draftFallbackEnabled.value
+            ? (draftFallbackName.value ?? undefined)
             : undefined,
         mute: draftType.value === 'video' ? draftMute.value : false
       }
@@ -732,7 +782,7 @@ const addDraft = async (): Promise<boolean> => {
 }
 
 /** Applies the dialog values onto an existing playlist item. */
-const editDraft = async (): Promise<boolean> => {
+const editDraft = (): boolean => {
   if (!canSubmitDraft.value) {
     return false
   }
@@ -759,11 +809,16 @@ const editDraft = async (): Promise<boolean> => {
           ? {
               id: current.id,
               type: draftType.value,
-              src: asset.path,
+              src: asset.id,
+              sourceName: asset.name,
               ...buildPlaybackFields(draftType.value),
               fallbackSrc:
                 draftType.value === 'web' && draftFallbackEnabled.value
                   ? (draftFallback.value ?? undefined)
+                  : undefined,
+              fallbackName:
+                draftType.value === 'web' && draftFallbackEnabled.value
+                  ? (draftFallbackName.value ?? undefined)
                   : undefined,
               mute: draftType.value === 'video' ? draftMute.value : false
             }
@@ -776,15 +831,9 @@ const editDraft = async (): Promise<boolean> => {
   }
 
   const trimmed = urlInput.value.trim()
-  let src = trimmed
-  let originUrl: string | undefined
-
-  if (draftType.value !== 'web' && trimmed.startsWith('http')) {
-    const cached = await api.assets.cacheRemote(trimmed, draftType.value)
-    if (cached) {
-      src = cached.localPath
-      originUrl = cached.originalUrl
-    }
+  if (draftType.value === 'web' && !isAllowedWebUrl(trimmed)) {
+    urlInputTouched.value = true
+    return false
   }
 
   emitPlaylist(
@@ -793,12 +842,16 @@ const editDraft = async (): Promise<boolean> => {
         ? {
             id: current.id,
             type: draftType.value,
-            src,
-            originUrl,
+            src: trimmed,
+            sourceName: undefined,
             ...buildPlaybackFields(draftType.value),
             fallbackSrc:
               draftType.value === 'web' && draftFallbackEnabled.value
                 ? (draftFallback.value ?? undefined)
+                : undefined,
+            fallbackName:
+              draftType.value === 'web' && draftFallbackEnabled.value
+                ? (draftFallbackName.value ?? undefined)
                 : undefined,
             mute: draftType.value === 'video' ? draftMute.value : false
           }
@@ -811,9 +864,8 @@ const editDraft = async (): Promise<boolean> => {
 }
 
 /** Commits the draft from the dialog into the playlist and closes the dialog. */
-const submitDraft = async () => {
-  const submitted =
-    dialogMode.value === 'edit' ? await editDraft() : await addDraft()
+const submitDraft = () => {
+  const submitted = dialogMode.value === 'edit' ? editDraft() : addDraft()
   if (!submitted) {
     return
   }
@@ -821,27 +873,32 @@ const submitDraft = async () => {
   isDraftDialogVisible.value = false
 }
 
-const assetLabel = (asset: PickedAsset) =>
-  asset.name ?? titleFromPath(asset.path)
+const assetLabel = (asset: PickedAsset) => asset.name
 
 const itemLabel = (item: PlaylistItem) =>
-  titleFromPath(item.originUrl ?? item.src)
+  item.sourceName ??
+  (isDirectMediaUrl(item.src) ? titleFromPath(item.src) : 'ローカル素材')
 
 const itemSourceLabel = (item: PlaylistItem) =>
-  item.originUrl ? `キャッシュ元: ${item.originUrl}` : item.src
+  item.type === 'web' || isDirectMediaUrl(item.src)
+    ? item.src
+    : 'ローカルファイル'
 
 const itemStateLabel = (item: PlaylistItem) => {
   const labels = [
     item.type === 'video' && item.mute ? 'ミュート' : null,
     item.type === 'web' && item.fallbackSrc
-      ? `フォールバック: ${fallbackLabel(item.fallbackSrc)}`
+      ? `フォールバック: ${fallbackLabel(item.fallbackSrc, item.fallbackName)}`
       : null
   ].filter((label): label is string => Boolean(label))
 
   return labels.join(' / ')
 }
 
-const fallbackLabel = (src?: string) => (src ? titleFromPath(src) : '未選択')
+const fallbackLabel = (src?: string, name?: string) =>
+  src
+    ? (name ?? (isDirectMediaUrl(src) ? titleFromPath(src) : 'ローカル素材'))
+    : '未選択'
 
 const moveItem = (index: number, direction: -1 | 1) => {
   const nextIndex = index + direction
@@ -870,6 +927,13 @@ const removeItem = (index: number) => {
     line-height: 1.5;
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
+  }
+
+  .validation-error {
+    margin: 0;
+    color: var(--p-red-600, #b42318);
+    font-size: 12.5px;
+    line-height: 1.5;
   }
 
   .row,

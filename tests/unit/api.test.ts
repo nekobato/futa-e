@@ -17,7 +17,7 @@ const createPreloadApi = (): FutaeApi => ({
   },
   assets: {
     pickFiles: async () => [],
-    cacheRemote: async () => null
+    toUrl: (assetId) => `futae-media://asset/${assetId}`
   },
   displays: {
     list: async () => [],
@@ -29,8 +29,9 @@ const createPreloadApi = (): FutaeApi => ({
     status: async () => ({ running: false, displayCount: 0 }),
     heartbeat: () => undefined
   },
-  utils: {
-    toFileUrl: (filePath) => `file://${filePath}`
+  system: {
+    getLaunchAtLogin: async () => ({ supported: true, enabled: false }),
+    setLaunchAtLogin: async (enabled) => ({ supported: true, enabled })
   }
 })
 

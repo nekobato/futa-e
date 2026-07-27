@@ -46,14 +46,22 @@ export const syncPlaylistsWithSource = (
   })
 }
 
-export const createDisplayConfig = (config: PlayerConfig): DisplayConfig => ({
-  enabled: true,
+export const createDisplayConfig = (
+  config: PlayerConfig,
+  enabled = true
+): DisplayConfig => ({
+  enabled,
   playlists: ensurePlaylists(config.playlists)
 })
 
 export const ensureDisplayConfigs = (
   config: PlayerConfig,
-  displays: DisplayInfo[]
+  displays: DisplayInfo[],
+  {
+    newDisplayEnabled = true
+  }: {
+    newDisplayEnabled?: boolean
+  } = {}
 ): PlayerConfig => {
   const nextDisplays = { ...config.displays }
 
@@ -67,7 +75,7 @@ export const ensureDisplayConfigs = (
             current.playlists
           )
         }
-      : createDisplayConfig(config)
+      : createDisplayConfig(config, newDisplayEnabled)
   })
 
   return {

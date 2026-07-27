@@ -16,6 +16,7 @@ module.exports = {
     schemes: ['futa-e']
   },
   files: ['dist/**/*', 'dist-electron/**/*', 'resources/**/*', 'package.json'],
+  extraFiles: ['LICENSE'],
   mac: {
     category: 'public.app-category.video',
     target: [

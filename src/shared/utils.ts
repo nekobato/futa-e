@@ -43,6 +43,30 @@ export const clampNumber = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max)
 
 /**
+ * Returns whether a Web playlist source is an absolute HTTPS URL.
+ */
+export const isAllowedWebUrl = (value: string): boolean => {
+  try {
+    return new URL(value.trim()).protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Returns whether a media source can be loaded directly by the renderer.
+ */
+export const isDirectMediaUrl = (value: string): boolean => {
+  try {
+    return ['http:', 'https:', 'blob:', 'data:'].includes(
+      new URL(value.trim()).protocol
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
  * Detects absolute filesystem paths that should be resolved as local media.
  */
 export const isLikelyLocalFilePath = (value: string): boolean =>

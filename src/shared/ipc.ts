@@ -1,6 +1,4 @@
 import type {
-  AssetType,
-  CacheResult,
   DisplayInfo,
   PickedAsset,
   PlayerConfig,
@@ -17,6 +15,11 @@ export type ConfigDiagnostics = {
   configPath: string | null
 }
 
+export type LaunchAtLoginSettings = {
+  supported: boolean
+  enabled: boolean
+}
+
 export type FutaeApi = {
   config: {
     get: () => Promise<PlayerConfig>
@@ -27,7 +30,7 @@ export type FutaeApi = {
   }
   assets: {
     pickFiles: (options?: AssetPickOptions) => Promise<PickedAsset[]>
-    cacheRemote: (url: string, type: AssetType) => Promise<CacheResult | null>
+    toUrl: (assetId: string) => string
   }
   displays: {
     list: () => Promise<DisplayInfo[]>
@@ -39,7 +42,8 @@ export type FutaeApi = {
     status: () => Promise<PlayerStatus>
     heartbeat: () => void
   }
-  utils: {
-    toFileUrl: (filePath: string) => string
+  system: {
+    getLaunchAtLogin: () => Promise<LaunchAtLoginSettings>
+    setLaunchAtLogin: (enabled: boolean) => Promise<LaunchAtLoginSettings>
   }
 }

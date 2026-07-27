@@ -23,6 +23,7 @@ import type {
   PlaylistConfig,
   PlaylistItem
 } from '../shared/types'
+import type { LaunchAtLoginSettings } from '../shared/ipc'
 import { createId } from '../shared/utils'
 
 /**
@@ -37,6 +38,12 @@ export const useControlView = () => {
     running: false,
     displayCount: 0
   })
+  const launchAtLoginSettings = ref<LaunchAtLoginSettings>({
+    supported: false,
+    enabled: false
+  })
+  const launchAtLoginPending = ref(false)
+  const launchAtLoginError = ref('')
   const selectedPlaylistId = ref('')
   const selectedPlaylistScope = ref('shared')
 
@@ -66,7 +73,7 @@ export const useControlView = () => {
   /** Returns the effective display configuration for a display id. */
   const getDisplayConfig = (displayId: string): DisplayConfig =>
     config.value.displays[displayId] ?? {
-      enabled: true,
+      enabled: false,
       playlists: config.value.playlists.map((playlist) =>
         clonePlaylist(playlist)
       )
@@ -135,7 +142,9 @@ export const useControlView = () => {
   /** Synchronizes connected display changes into the editable config. */
   const syncDisplays = (displays: DisplayInfo[]) => {
     displayInfos.value = displays
-    config.value = ensureDisplayConfigs(config.value, displays)
+    config.value = ensureDisplayConfigs(config.value, displays, {
+      newDisplayEnabled: false
+    })
     autoSave.touch()
     syncSelection()
   }
@@ -183,6 +192,17 @@ export const useControlView = () => {
     }
   }
 
+  /** Refreshes the launch-at-login value from macOS system settings. */
+  const refreshLaunchAtLogin = async () => {
+    try {
+      launchAtLoginSettings.value = await api.system.getLaunchAtLogin()
+      launchAtLoginError.value = ''
+    } catch (error) {
+      console.error('Failed to read launch-at-login settings.', error)
+      launchAtLoginError.value = 'ログイン起動設定を読み込めませんでした。'
+    }
+  }
+
   /** Loads persisted config, current displays, and player state. */
   const loadConfig = async () => {
     autoSave.pause()
@@ -192,12 +212,54 @@ export const useControlView = () => {
       api.displays.list(),
       api.player.status()
     ])
+    const hasNewDisplays = nextDisplays.some(
+      (display) =>
+        !Object.prototype.hasOwnProperty.call(nextConfig.displays, display.id)
+    )
     displayInfos.value = nextDisplays
-    config.value = ensureDisplayConfigs(nextConfig, nextDisplays)
+    config.value = ensureDisplayConfigs(nextConfig, nextDisplays, {
+      newDisplayEnabled: false
+    })
     syncSelection()
     autoSave.resume(config.value)
+    if (hasNewDisplays) {
+      autoSave.touch()
+    }
     status.value = nextStatus
+    await refreshLaunchAtLogin()
     isConfigReady.value = true
+  }
+
+  /** Updates the macOS login item without changing Kiosk state. */
+  const setLaunchAtLogin = async (enabled: boolean) => {
+    if (!launchAtLoginSettings.value.supported || launchAtLoginPending.value) {
+      return
+    }
+
+    launchAtLoginPending.value = true
+    launchAtLoginError.value = ''
+
+    try {
+      launchAtLoginSettings.value = await api.system.setLaunchAtLogin(enabled)
+    } catch (error) {
+      console.error('Failed to update launch-at-login settings.', error)
+      try {
+        launchAtLoginSettings.value = await api.system.getLaunchAtLogin()
+      } catch (refreshError) {
+        console.error(
+          'Failed to refresh launch-at-login settings.',
+          refreshError
+        )
+      }
+      launchAtLoginError.value = 'ログイン起動設定を変更できませんでした。'
+    } finally {
+      launchAtLoginPending.value = false
+    }
+  }
+
+  /** Refreshes externally editable OS settings when the window regains focus. */
+  const handleWindowFocus = () => {
+    void refreshLaunchAtLogin()
   }
 
   /** Selects the working playlist and resets the tab scope. */
@@ -583,10 +645,12 @@ export const useControlView = () => {
     removeDisplayListener = api.displays.onChanged((displays) => {
       syncDisplays(displays)
     })
+    window.addEventListener('focus', handleWindowFocus)
   })
 
   onBeforeUnmount(() => {
     removeDisplayListener?.()
+    window.removeEventListener('focus', handleWindowFocus)
     void autoSave
       .flush()
       .catch((error) => {
@@ -604,6 +668,9 @@ export const useControlView = () => {
     displayInfos,
     duplicateSelectedPlaylist,
     isConfigReady,
+    launchAtLoginError,
+    launchAtLoginPending,
+    launchAtLoginSettings,
     moveSelectedPlaylist,
     removeSelectedPlaylist,
     renameSelectedPlaylist,
@@ -613,6 +680,7 @@ export const useControlView = () => {
     selectedPlaylistScope,
     setActivePlaylist,
     setDisplayEnabled,
+    setLaunchAtLogin,
     startPlayer,
     toggleSelectedPlaylistPerDisplay,
     updateSelectedDisplayPlaylist,

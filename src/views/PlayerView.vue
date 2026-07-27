@@ -21,7 +21,7 @@
         @error="onMediaError"
       />
       <iframe
-        v-else-if="currentItem?.type === 'web'"
+        v-else-if="currentItem?.type === 'web' && currentSource"
         :src="currentSource"
         @load="onWebLoaded"
       ></iframe>
@@ -55,10 +55,7 @@
       <div>
         <img :src="fallbackSource" alt="フォールバック表示" />
         <h2>Web フォールバック</h2>
-        <p>
-          Web
-          コンテンツの読込がタイムアウトしたため、フォールバックへ切り替えました。
-        </p>
+        <p>{{ webFallbackMessage }}</p>
       </div>
     </div>
 
@@ -81,8 +78,16 @@ import {
   nextPlayablePointer,
   resolveItemAdvancePolicy
 } from '../shared/playback'
+import {
+  isBundledMediaSource,
+  SAFE_MODE_MEDIA_SOURCE
+} from '../shared/local-assets'
 import type { DisplayInfo, PlayerConfig, PlaylistItem } from '../shared/types'
-import { isLikelyLocalFilePath, titleFromPath } from '../shared/utils'
+import {
+  isAllowedWebUrl,
+  isDirectMediaUrl,
+  titleFromPath
+} from '../shared/utils'
 
 const api = getFutaeApi()
 const displayId = new URLSearchParams(window.location.search).get('displayId')
@@ -103,7 +108,10 @@ let heartbeatTimer: number | null = null
 let removeConfigListener: (() => void) | null = null
 let removeDisplayListener: (() => void) | null = null
 
-const safeModeUrl = new URL('/safe-mode.svg', window.location.origin).toString()
+const safeModeUrl = new URL(
+  SAFE_MODE_MEDIA_SOURCE,
+  window.location.origin
+).toString()
 
 const effectiveDisplay = computed(() =>
   getEffectiveDisplayConfig(config.value, displayId)
@@ -133,37 +141,47 @@ const currentItemHeldForever = computed(() =>
 )
 const currentItemAlt = computed(() =>
   currentItem.value
-    ? titleFromPath(currentItem.value.originUrl ?? currentItem.value.src)
+    ? (currentItem.value.sourceName ?? titleFromPath(currentItem.value.src))
     : 'プレイリスト項目'
 )
 const safeMode = computed(() => Boolean(safeModeMessage.value))
 const showWebFallback = computed(
   () => currentItem.value?.type === 'web' && webState.value === 'failed'
 )
+const invalidCurrentWebUrl = computed(
+  () =>
+    currentItem.value?.type === 'web' && !isAllowedWebUrl(currentItem.value.src)
+)
+const webFallbackMessage = computed(() =>
+  invalidCurrentWebUrl.value
+    ? 'Web URL が HTTPS ではないため、フォールバックへ切り替えました。'
+    : 'Web コンテンツの読込がタイムアウトしたため、フォールバックへ切り替えました。'
+)
 
 const resolveSource = (src: string): string => {
   if (!src) {
     return ''
   }
-  if (isLikelyLocalFilePath(src)) {
-    return api.utils.toFileUrl(src)
+
+  if (isBundledMediaSource(src)) {
+    return new URL(src, window.location.origin).toString()
   }
-  if (
-    src.startsWith('http') ||
-    src.startsWith('blob:') ||
-    src.startsWith('data:') ||
-    src.startsWith('file://') ||
-    src.startsWith('futae-media://') ||
-    src.startsWith('/')
-  ) {
-    return src
-  }
-  return api.utils.toFileUrl(src)
+
+  return isDirectMediaUrl(src) ? src : api.assets.toUrl(src)
 }
 
-const currentSource = computed(() =>
-  currentItem.value ? resolveSource(currentItem.value.src) : ''
-)
+const currentSource = computed(() => {
+  const item = currentItem.value
+  if (!item) {
+    return ''
+  }
+
+  if (item.type === 'web') {
+    return isAllowedWebUrl(item.src) ? item.src.trim() : ''
+  }
+
+  return resolveSource(item.src)
+})
 const fallbackSource = computed(() => {
   if (!currentItem.value?.fallbackSrc) {
     return safeModeUrl
@@ -229,9 +247,10 @@ const startPlaybackForItem = (item: PlaylistItem | null) => {
   }
 
   safeModeMessage.value = ''
-  webState.value = item.type === 'web' ? 'loading' : 'ready'
+  const shouldLoadWeb = item.type === 'web' && isAllowedWebUrl(item.src)
+  webState.value = item.type === 'web' && !shouldLoadWeb ? 'failed' : 'ready'
 
-  if (item.type === 'web') {
+  if (shouldLoadWeb) {
     startWebTimeout()
   }
 

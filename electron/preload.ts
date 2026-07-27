@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AssetType } from '../src/shared/types'
 import type { AssetPickOptions, FutaeApi } from '../src/shared/ipc'
 
 const LOCAL_MEDIA_SCHEME = 'futae-media'
@@ -21,8 +20,8 @@ const api: FutaeApi = {
   assets: {
     pickFiles: (options?: AssetPickOptions) =>
       ipcRenderer.invoke('assets:pick-files', options),
-    cacheRemote: (url: string, type: AssetType) =>
-      ipcRenderer.invoke('assets:cache-remote', { url, type })
+    toUrl: (assetId: string) =>
+      `${LOCAL_MEDIA_SCHEME}://asset/${encodeURIComponent(assetId)}`
   },
   displays: {
     list: () => ipcRenderer.invoke('displays:list'),
@@ -40,9 +39,10 @@ const api: FutaeApi = {
     status: () => ipcRenderer.invoke('player:status'),
     heartbeat: () => ipcRenderer.send('player:heartbeat')
   },
-  utils: {
-    toFileUrl: (filePath: string) =>
-      `${LOCAL_MEDIA_SCHEME}://local/${encodeURIComponent(filePath)}`
+  system: {
+    getLaunchAtLogin: () => ipcRenderer.invoke('system:get-launch-at-login'),
+    setLaunchAtLogin: (enabled) =>
+      ipcRenderer.invoke('system:set-launch-at-login', enabled)
   }
 }
 

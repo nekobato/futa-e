@@ -85,6 +85,13 @@
         @toggle-display="setDisplayEnabled"
       />
 
+      <StartupSettingsPanel
+        :settings="launchAtLoginSettings"
+        :pending="launchAtLoginPending"
+        :error-message="launchAtLoginError"
+        @update="setLaunchAtLogin"
+      />
+
       <PlaylistWorkbenchSection
         :config="config"
         :display-infos="displayInfos"
@@ -122,6 +129,7 @@ import { ref } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import DisplaySettingsPanel from '../components/control/DisplaySettingsPanel.vue'
 import PlaylistWorkbenchSection from '../components/control/PlaylistWorkbenchSection.vue'
+import StartupSettingsPanel from '../components/control/StartupSettingsPanel.vue'
 import { useControlView } from '../composables/useControlView'
 
 const {
@@ -131,6 +139,9 @@ const {
   displayInfos,
   duplicateSelectedPlaylist,
   isConfigReady,
+  launchAtLoginError,
+  launchAtLoginPending,
+  launchAtLoginSettings,
   moveSelectedPlaylist,
   removeSelectedPlaylist,
   renameSelectedPlaylist,
@@ -140,6 +151,7 @@ const {
   selectedPlaylistScope,
   setActivePlaylist,
   setDisplayEnabled,
+  setLaunchAtLogin,
   startPlayer,
   toggleSelectedPlaylistPerDisplay,
   updateSelectedDisplayPlaylist,

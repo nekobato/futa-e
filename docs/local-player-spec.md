@@ -23,10 +23,11 @@ playlist item は少なくとも次の情報を持つ。
 - `id`
 - `type`
 - `src`
-- `originUrl`
+- `sourceName`
 - `playbackMode`
 - `durationSec`
 - `fallbackSrc`
+- `fallbackName`
 - `mute`
 
 ## playlist のルール
@@ -45,10 +46,14 @@ playlist item は少なくとも次の情報を持つ。
 
 ## Web の扱い
 
+- `web` の `src` は有効な absolute `https:` URL に限定する
+- 入力時の検証を通らない URL は保存しない
+- 保存済み設定に非 HTTPS の Web URL が残っている場合は `iframe` へ読み込まず、fallback 表示へ切り替える
 - `web` には `webTimeoutSec` を適用する
 - item が切り替わる前に指定時間へ到達し、表示準備が整っていない場合は fallback 表示へ切り替える
 - fallback 表示中も playlist の時間は進める
 - `fallbackSrc` がない場合は Safe Mode 用の既定画像を使う
+- 表示対象の内容、信頼性、権限要求、運用上の適合性は、URL を登録するユーザーが判断する
 
 ## media error の扱い
 
@@ -64,16 +69,29 @@ playlist item は少なくとも次の情報を持つ。
 - 検出可能な画像・動画エラーにより全 item が再生不能になった場合は Safe Mode に入る
 - `loop = false` の playlist が最後まで完了した場合は Safe Mode に入る
 - Safe Mode は「最低限、何かが表示されている状態」を守るための最後の砦とする
-- Watchdog の細かい段階復旧や自動回復条件は、当面は厳密に定義しない
+- Watchdogはrendererの無応答、renderer processの停止、15秒以上のheartbeat停止を検出し、対象windowをreloadする
+- Watchdogの段階的復旧、app process再起動、native fallbackは実装しない
 
 ## マルチモニター
 
-- 初期状態では、存在する全モニターに同一内容を表示する
+- 未登録のモニターは無効な状態で設定へ追加し、ユーザーが明示的に有効化する
+- 有効な全モニターへ、初期状態では同一内容を表示する
 - 各 playlist に `モニターを個別に設定する` の ToggleSwitch を用意する
 - 再生対象 playlist の ToggleSwitch が OFF の場合は共通設定のみを使う
 - 再生対象 playlist の ToggleSwitch が ON の場合は、現在存在するモニター一覧を取得し、各モニターごとに設定項目を表示する
 - モニターごとの識別子には `Electron.Display.id` を使う
 - 個別設定が存在しないモニターは共通設定へフォールバックする
+- Kiosk起動中にモニターを取り外した場合は、対応するplayer windowを閉じる
+- 有効な登録済みモニターを再接続した場合は、対応するplayer windowを再作成する
+- モニターの追加・取り外し・表示領域変更時は、既存player windowを現在のboundsへ再配置する
+- Kiosk起動後に初めて検出したモニターは、操作画面で有効化するまでKioskへ追加しない
+
+## OSログイン時の起動
+
+- packaged macOS appでは、操作画面からElectronのlogin itemを有効・無効にできる
+- login itemの状態はmacOSを正とし、`PlayerConfig`には保存しない
+- OSログイン時には操作画面とメニューバーを起動し、Kioskは自動開始しない
+- Kiosk実行状態はprocess内だけで管理し、アプリまたはOSの再起動後には復元しない
 
 ## 設定データの考え方
 
@@ -84,10 +102,11 @@ type PlaylistItem = {
   id: string
   type: 'image' | 'video' | 'web'
   src: string
-  originUrl?: string
+  sourceName?: string
   playbackMode?: 'auto' | 'duration' | 'forever'
   durationSec?: number
   fallbackSrc?: string
+  fallbackName?: string
   mute?: boolean
 }
 
@@ -123,14 +142,27 @@ type DisplayConfig = {
 - 現在の UI は一覧で選択した playlist を編集し、`activePlaylistId` の playlist を再生対象にする
 - 将来 Manifest を定義する場合も、このローカル設定との差分が小さくなるように寄せる
 
+## ローカル素材
+
+- 選択したファイルはアプリ領域へコピーせず、元の場所から再生する
+- ファイル選択時にmain processだけがabsolute pathと`realpath`を記録し、rendererへはopaque asset ID、media type、表示名だけを返す
+- ローカル素材の`src`と`fallbackSrc`にはopaque asset IDを保存し、absolute pathは保存しない
+- 旧バージョンの設定にabsolute pathが残っている場合は、初回読込時にmain process内のasset registryへ移行する
+- `futae-media://`は、現在のplayback configが参照する登録済みasset IDだけを解決する
+- 解決時は`realpath`が登録時から変わっていないregular fileであることと、拡張子が登録済みmedia typeに一致することを確認する
+- protocolは`GET`と`HEAD`だけを受理し、動画再生に必要な`Range` requestをfile responseへ転送する
+- responseの`Content-Type`は許可済み拡張子から固定し、`X-Content-Type-Options: nosniff`を付与する
+- ファイルの内容、権利、codec、移動・削除、外付けVolumeの接続状態はユーザーが管理する
+- malware scan、内容hash、アプリ領域への複製、素材容量管理は行わない
+
 ## cache と offline
 
-- URL path に拡張子があるリモートの `image` と `video` は、追加時にローカル cache へ保存する
-- `web` は cache しない
-- cache の上限容量は当面設けない
-- cache の自動掃除はしない
-- cache が作れない場合は、可能なら元の URL をそのまま使う
-- ローカル運用を前提とし、厳密な整合性管理は後回しにする
+- リモートの `image`、`video`、`web` は URL をそのまま Chromium に渡す
+- アプリ独自の download、永続cache、Content-Type検証、hash管理、容量管理、重複排除、削除処理は持たない
+- 通常の表示高速化には、Electronのdefault sessionで有効なChromium標準HTTP cacheだけを使用する
+- networkから取得できない画像・動画はmedia errorとして扱い、次のitemまたはSafe Modeへ移る
+- Webを指定時間内に読み込めない場合はfallback表示へ切り替える
+- offline再生は保証しない
 
 ## item 単位編集
 
@@ -151,7 +183,8 @@ playlist に追加済みの item ごとに、次の項目を編集できる。
 - Cloud 側の仕様
 - 厳密な RBAC
 - 高度な監視と分析
-- OS 自動起動や配布の厳密な運用設計
+- アプリまたはOSの再起動後にKioskを自動復元する処理
+- 配布の厳密な運用設計
 
 ## 方針
 

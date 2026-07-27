@@ -1,23 +1,54 @@
 # Futa-e V1 実装計画
 
-最終同期日: 2026-07-15
+最終同期日: 2026-07-27
 
 ## 現在地
 
 Apple Silicon Mac向けのローカルPlayerはv0.0.3まで公開済みである。
-複数DisplayへのKiosk表示、画像と動画とWebの再生、複数Playlist、Display別設定、Safe Mode、基本Watchdog、deep link、署名と公証を実装している。
-現在の作業ツリーではREADME、インストール、操作、既知の制約、実装状況の同期を進めているが、LICENSEはまだ存在しない。
+複数DisplayへのKiosk表示、画像と動画とWebの再生、複数Playlist、Display別設定、Safe Mode、基本Watchdog、Display hot-plug追従、macOSログイン時のアプリ起動、deep link、署名と公証を実装している。
+ローカルPlayerはMIT Licenseで公開し、ライセンス方針をREADMEと`package.json`へ反映している。
 このリポジトリの実装対象はローカルPlayerとし、Cloudは別リポジトリの長期構想として扱う。
+
+### v0.0.3 build検証記録
+
+2026-07-27にHEAD `dc144e1`（`package.json` version `0.0.3`）で、Node.js `22.14.0`とpnpm `9.15.0`を使用して次のコマンドが成功した。
+
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`（11 test files、44 tests）
+- `pnpm build`（renderer、Electron main、preload）
+
+`pnpm build`ではrendererのchunkが500 kBを超える警告が出るが、buildは成功している。
+
+公開済みv0.0.3はtag `v0.0.3`（commit `f05c819`）から作成された`Futa-e-v0.0.3-darwin-arm64.zip`で、SHA-256は`81909f4051da950c7a657314b845ed8e1571ba69adf38e80564c083ad48f4aa0`である。
+tagから検証対象HEADまでのアプリコード差分は`src/shared/playback.ts`の型定義の整形のみで、versionと`electron-builder.config.cjs`のartifact名も一致する。
+今回実行したのはapplication buildまでであり、署名・公証済みZIPの再生成や公開artifactとのバイナリ比較は行っていない。
+
+### security review記録
+
+2026-07-27にlocal media bridge、Web contentの`iframe`、CSP、navigation、permission、IPC senderをstatic reviewした。
+Criticalはなく、High 2件とMedium 4件を確認した。詳細と推奨する是正順序は[セキュリティレビュー](./docs/security-review.md)に記録している。
+Web URLは入力時と再生時に有効なabsolute HTTPS URLへ限定した。`iframe` sandboxとPermissions Policyは、表示対象をユーザーが確認して運用する方針に基づき採用しない。packaged rendererのCSPは未対応である。
+リモート画像・動画・Webはアプリ独自にcacheせず、通常の表示高速化はChromium標準HTTP cacheへ委ねる。networkから取得できない場合は、既存のitem skip、Web fallback、Safe Modeで処理する。
+
+local media bridgeは、rendererへabsolute pathを渡さず、main process専用registryのopaque asset IDからユーザーが選択した外部ファイルへ解決する方式へ移行した。再生時は現在のplayback config、登録時の`realpath`、regular file、media typeを照合し、`GET`/`HEAD`と動画の`Range` requestだけを扱う。素材はアプリ領域へコピーせず、内容、権利、codec、移動・削除、外付けVolumeはユーザーが管理する。
+
+### Kiosk運用機能の実装記録
+
+2026-07-27に、Kiosk起動中のDisplay追加・取り外し・表示領域変更を検出し、接続中かつ有効なDisplayとKiosk windowを差分同期する処理を実装した。Display構成の変更時は既存windowも現在のboundsへ再配置する。新しく検出したDisplayは初期状態で無効とし、操作画面で明示的に有効化した場合だけKioskへ追加する。
+
+packaged macOS appでは、操作画面からElectronのlogin itemを有効・無効にできる。ログイン時に起動するのはアプリの操作画面とメニューバーだけであり、Kioskは自動開始しない。Kiosk実行状態は永続化せず、アプリまたはOSの再起動後には復元しない。
+
+Watchdogは、rendererの無応答、renderer processの停止、15秒以上のheartbeat停止を検出して対象windowをreloadする基本実装を維持する。段階的復旧、app process再起動、native fallbackは実装対象としない。
 
 ## 次に行うこと
 
-- [ ] READMEが参照するLICENSEを追加し、ライセンス方針を`package.json`と文書へ反映する。
-- [ ] 現HEADで`lint`、`typecheck`、`test`、application buildを実行し、v0.0.3のartifactとの対応を記録する。
 - [ ] 複数Display、offline、fallback、Safe Mode、Watchdog、Kiosk終了、deep linkを実機で確認する。
-- [ ] rendererからabsolute pathを扱うlocal media bridgeと、Web contentを表示する`iframe`のsandboxとCSPをsecurity reviewする。
-- [ ] remote cacheのContent-Type、hash、整合性、容量上限、重複排除、削除方針を決める。
-- [ ] 段階的Watchdog、Display hot-plug時の再配置、OSログイン時の自動起動、再起動後のKiosk復帰を実装する。
-- [ ] application CIへfrozen install、lint、typecheck、test、buildを追加する。
+- [ ] remote contentのpermissionをdefault denyにし、navigation、window生成、IPC senderとwindow roleを制限する。
+- [x] local media bridgeをopaque asset IDと許可済みreal pathへ移行し、media typeとmethodを制限する。
+- [x] local media bridgeのsecurity regression testを追加する。
+- [ ] permission、navigation、IPCのsecurity regression testを追加する。
+- [x] application CIへfrozen install、lint、typecheck、test、buildを追加する（pull request、`main`へのpush、手動実行）。
 - [ ] Manifest v1 JSON SchemaとDevice Protocol v1をこのリポジトリで扱う範囲を決める。
 - [ ] Windows、Linux、Intel Macを対応範囲に含めるか決める。
 
@@ -85,10 +116,10 @@ Apple Silicon Mac向けのローカルPlayerはv0.0.3まで公開済みである
 
 - Watchdog（無応答 → 復旧）
 - Safe Mode（最後の砦：静止画 1 枚でも出す）
-- オフラインキャッシュ（ネットが切れても継続）
+- remote content取得失敗時のfallback
 - Publish の原子性（新セットが揃うまで切替しない）
 
-> 実装技術を変更しても、段階的な復旧手順を維持できる設計にする。
+> 実装技術を変更しても、rendererの異常を検出して表示を再読込する基本的な復旧手順を維持できる設計にする。
 
 ## 2.5 Cloud は「他人の表示を安全に触れる」ことを売る
 
@@ -140,8 +171,8 @@ Apple Silicon Mac向けのローカルPlayerはv0.0.3まで公開済みである
 
 - [ ] manifest schema（Player で参照する JSON Schema。Cloud 側は別リポジトリで同一仕様を参照）
 - [ ] shared 定義の完成（型と IPC は実装済み。共通エラーコードとログ形式は未定義）
-- [ ] Player の CI（現行 CI は Web 背景カタログの build / deploy のみ）
-- [ ] ライセンス方針の確定と README / `package.json` への反映
+- [x] PlayerのCI（frozen install、lint、typecheck、test、application build）
+- [x] ライセンス方針の確定と README / `package.json` への反映
 
 ### 判定条件
 
@@ -188,8 +219,7 @@ V1ではPlayerの安定性をCloud実装より先に固める。
 
 ### 機能（必須）
 
-- [ ] オフラインキャッシュ（URL に拡張子がある image/video の追加時キャッシュのみ実装済み。Content-Type / hash / 整合性検証、上限、掃除、重複排除は未実装）
-- [ ] Watchdog（renderer の heartbeat、無応答、停止時の reload は実装済み。段階的復旧は未実装）
+- [x] 基本Watchdog（rendererのheartbeat、無応答、停止時に対象windowをreloadする。段階的復旧は採用しない）
 - [ ] フォルダ単位の画像・動画取り込み
 
 ### 機能（任意だが早期に効く）
@@ -199,9 +229,8 @@ V1ではPlayerの安定性をCloud実装より先に固める。
 
 ### 判定条件（サイネージとしての DoD）
 
-- [ ] ネット切断 → 再接続でも表示が継続・復帰する（キャッシュ済み画像・動画に限り継続可能）
+- [ ] ネット切断時に取得不能なremote itemが既存のfallbackまたはSafe Modeへ移り、再接続後に再生へ復帰する
 - [ ] Web が落ちる/遅い → fallback に落ちる（item が切り替わる前に timeout へ到達した場合の fallback のみ実装済み。HTTP エラーや埋め込み拒否は検出できない）
-- [ ] 端末再起動 → 自動で展示状態に戻せる（OS の自動起動設定を含む）
 
 ---
 
@@ -345,10 +374,9 @@ Workers Analytics Engine は保持 3 ヶ月。 ([Cloudflare Docs][11])
 
 ## 6.2 Player（macOS）
 
-- [ ] Display manager（モニタ列挙と Kiosk window 生成は実装済み。hot-plug 復帰は未実装）
-- [ ] Cache manager（image/video の HTTP status を確認したダウンロードのみ実装済み。Content-Type / hash / 整合性検証、上限、重複排除、掃除は未実装）
-- [ ] Watchdog（renderer health と reload は実装済み。段階的復旧と native fallback は未実装）
-- [ ] OS ログイン時の自動起動
+- [x] Display manager（モニタ列挙、Kiosk window生成、hot-plug時の差分同期と再配置）
+- [x] 基本Watchdog（renderer healthを監視し、異常時に対象windowをreloadする）
+- [x] OSログイン時のアプリ起動（packaged macOS appのみ。Kioskは自動開始しない）
 - [ ] アプリ内自動更新
 
 ## 6.3 Cloud（Workers + D1 + R2）
@@ -369,7 +397,7 @@ Workers Analytics Engine は保持 3 ヶ月。 ([Cloudflare Docs][11])
 
 # 7. 仕上げの判定（V1 としての“成立条件”）
 
-- [ ] **ローカル単体で展示運用できる**（基本再生は可能。自動起動、完全な offline、hot-plug 復帰が未完了）
+- [ ] **ローカル単体で展示運用できる**（ローカル素材の基本再生、アプリのログイン起動、hot-plug追従は可能。Kiosk状態は再起動後に復元せず、remote contentはonline接続を前提とする）
 - [ ] **Cloud は「ルーム + 権限」で他人の表示を安全に変えられる**（別リポジトリの対象）
 - [ ] **端末が増えても、端末側は静的配布物を取りに行くだけ**（Cloud 未実装）
 - [ ] **障害が起きても、絵が消えない**（renderer crash-loop を含む最後の砦は未実装）

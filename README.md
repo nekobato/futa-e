@@ -15,6 +15,8 @@ Futa E は、画像・動画・Web ページを複数のディスプレイへ全
 - 設定の自動保存
 - 空のプレイリストや再生失敗時の Safe Mode
 - renderer の無応答や停止を検出する基本的な Watchdog
+- Kiosk 起動中の Display 接続変更と表示領域変更への追従
+- macOS ログイン時のアプリ起動（Kiosk は自動開始しない）
 - メニューバー、`Escape` キー、deep link による Kiosk 操作
 
 ## クイックスタート
@@ -35,6 +37,7 @@ Kiosk を終了するには、`Escape` キーを 2 秒以内に 3 回押しま�
 - [操作ガイド](./docs/usage.md)
 - [既知の制約](./docs/known-limitations.md)
 - [ローカルプレイヤー仕様](./docs/local-player-spec.md)
+- [セキュリティレビュー](./docs/security-review.md)
 - [実装計画と進捗](./PLAN.md)
 - [Web 背景カタログ](https://nekobato.github.io/futa-e/)
 
@@ -66,4 +69,4 @@ pnpm build
 
 ## ライセンス
 
-ライセンスは [LICENSE](./LICENSE) を参照してください。
+このプロジェクトは MIT License で公開しています。詳細は [LICENSE](./LICENSE) を参照してください。

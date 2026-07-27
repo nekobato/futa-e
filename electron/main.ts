@@ -8,25 +8,20 @@ import {
   net,
   protocol,
   screen,
-  Tray
+  Tray,
+  type Display
 } from 'electron'
 import { pathToFileURL } from 'node:url'
-import { extname, isAbsolute, join } from 'node:path'
-import { existsSync, promises as fs } from 'node:fs'
+import { join } from 'node:path'
+import { existsSync } from 'node:fs'
 import type {
-  AssetType,
-  CacheResult,
   DisplayInfo,
   PickedAsset,
   PlayerConfig,
   PlayerStatus
 } from '../src/shared/types'
 import { coerceConfig, createDefaultConfig } from '../src/shared/defaults'
-import { filterEnabledDisplays } from '../src/shared/player-config'
-import {
-  dialogExtensionsForKind,
-  toPickedAssetFromPath
-} from '../src/shared/picked-assets'
+import { dialogExtensionsForKind } from '../src/shared/picked-assets'
 import {
   getConfigDiagnostics,
   loadConfig,
@@ -37,6 +32,11 @@ import {
   createPlayerExitShortcutDetector,
   shouldBlockPlayerWindowEscape
 } from './player-window-input'
+import { createLaunchAtLoginController } from './login-item'
+import {
+  planPlayerWindowReconciliation,
+  selectPlayerTargetDisplays
+} from './player-window-reconciliation'
 import {
   applyPlayerWindowPresentation,
   restorePlayerWindowPresentation
@@ -47,9 +47,13 @@ import {
   parseDeepLink,
   type DeepLinkCommand
 } from './deep-link'
+import { collectAllowedLocalAssets } from './local-asset-config'
+import { getLocalAssetRegistry } from './local-assets'
+import { createLocalMediaProtocolHandler } from './local-media-protocol'
 
 const APP_NAME = 'Futa E'
 const LOCAL_MEDIA_SCHEME = 'futae-media'
+const DISPLAY_CHANGE_DEBOUNCE_MS = 300
 
 app.setName(APP_NAME)
 const hasSingleInstanceLock = app.requestSingleInstanceLock()
@@ -63,21 +67,27 @@ protocol.registerSchemesAsPrivileged([
     privileges: {
       secure: true,
       standard: true,
-      supportFetchAPI: true
+      stream: true
     }
   }
 ])
 
 let controlWindow: BrowserWindow | null = null
-let playerWindows: BrowserWindow[] = []
+const playerWindows = new Map<string, BrowserWindow>()
+let playerModeActive = false
+let playerModeInitialDisplayIds = new Set<string>()
 let statusTray: Tray | null = null
 let editableConfig: PlayerConfig = createDefaultConfig()
 let playbackConfig: PlayerConfig = createDefaultConfig()
 const heartbeatMap = new Map<number, number>()
 let heartbeatInterval: NodeJS.Timeout | null = null
+let displayChangeTimer: NodeJS.Timeout | null = null
+let playerWindowReconcileTask: Promise<void> = Promise.resolve()
+const pendingRecreateDisplayIds = new Set<string>()
 let deepLinksReady = false
 const queuedDeepLinkCommands: DeepLinkCommand[] = []
 let closePlayerWindowsTask: Promise<void> | null = null
+const launchAtLoginController = createLaunchAtLoginController(app)
 
 /** Returns the bundled preload script path from the current application root. */
 const getPreloadPath = () =>
@@ -136,19 +146,6 @@ const registerDeepLinkProtocol = () => {
 }
 
 /**
- * Decodes a local-media protocol request into an absolute file path.
- */
-const decodeLocalMediaPath = (requestUrl: string): string | null => {
-  const { host, pathname } = new URL(requestUrl)
-  if (host !== 'local' || pathname.length <= 1) {
-    return null
-  }
-
-  const filePath = decodeURIComponent(pathname.slice(1))
-  return isAbsolute(filePath) ? filePath : null
-}
-
-/**
  * Registers the protocol handler used to stream local media files in Electron.
  */
 const registerLocalMediaProtocol = () => {
@@ -156,20 +153,16 @@ const registerLocalMediaProtocol = () => {
     return
   }
 
-  protocol.handle(LOCAL_MEDIA_SCHEME, (request) => {
-    const filePath = decodeLocalMediaPath(request.url)
-
-    if (!filePath) {
-      return new Response('Invalid local media request.', {
-        status: 400,
-        headers: {
-          'content-type': 'text/plain; charset=utf-8'
-        }
-      })
-    }
-
-    return net.fetch(pathToFileURL(filePath).toString())
-  })
+  const registry = getLocalAssetRegistry()
+  protocol.handle(
+    LOCAL_MEDIA_SCHEME,
+    createLocalMediaProtocolHandler({
+      getAllowedType: (assetId) =>
+        collectAllowedLocalAssets(playbackConfig).get(assetId) ?? null,
+      resolve: (assetId, type) => registry.resolve(assetId, type),
+      fetchFile: (url, init) => net.fetch(url, init)
+    })
+  )
 }
 
 const getRendererUrl = (
@@ -215,49 +208,16 @@ const pickFiles = async (
     return []
   }
 
-  return result.filePaths
-    .map((path) => toPickedAssetFromPath(path, kind))
-    .filter((asset): asset is PickedAsset => Boolean(asset))
-}
-
-const downloadToFile = async (
-  url: string,
-  targetPath: string
-): Promise<void> => {
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error(`download failed: ${response.status}`)
-  }
-  const buffer = Buffer.from(await response.arrayBuffer())
-  await fs.writeFile(targetPath, buffer)
-}
-
-const cacheRemoteAsset = async (
-  url: string,
-  type: AssetType
-): Promise<CacheResult | null> => {
-  if (type === 'web') {
-    return null
+  const registry = getLocalAssetRegistry()
+  const assets: PickedAsset[] = []
+  for (const filePath of result.filePaths) {
+    const asset = await registry.register(filePath, kind)
+    if (asset) {
+      assets.push(asset)
+    }
   }
 
-  const parsed = new URL(url)
-  const ext = extname(parsed.pathname)
-  if (!ext) {
-    return null
-  }
-
-  const cacheDir = join(app.getPath('userData'), 'cache')
-  await fs.mkdir(cacheDir, { recursive: true })
-
-  const fileName = `${Date.now()}-${Math.random().toString(16).slice(2)}${ext}`
-  const localPath = join(cacheDir, fileName)
-
-  try {
-    await downloadToFile(url, localPath)
-    return { localPath, originalUrl: url }
-  } catch {
-    return null
-  }
+  return assets
 }
 
 const broadcastConfig = (config: PlayerConfig) => {
@@ -274,6 +234,44 @@ const broadcastDisplays = () => {
   }
 }
 
+/** Debounces display changes and reconciles Kiosk windows when active. */
+const scheduleDisplayReconciliation = (recreateDisplayId?: string) => {
+  if (recreateDisplayId) {
+    pendingRecreateDisplayIds.add(recreateDisplayId)
+  }
+
+  if (displayChangeTimer) {
+    clearTimeout(displayChangeTimer)
+  }
+
+  displayChangeTimer = setTimeout(() => {
+    displayChangeTimer = null
+    const recreateDisplayIds = new Set(pendingRecreateDisplayIds)
+    pendingRecreateDisplayIds.clear()
+    broadcastDisplays()
+
+    if (playerModeActive) {
+      void queuePlayerWindowReconciliation(recreateDisplayIds)
+    }
+  }, DISPLAY_CHANGE_DEBOUNCE_MS)
+}
+
+/** Repositions existing Kiosk windows after a display topology change. */
+const handleDisplayTopologyChanged = () => {
+  playerWindows.forEach((_win, displayId) => {
+    pendingRecreateDisplayIds.add(displayId)
+  })
+  scheduleDisplayReconciliation()
+}
+
+/** Recreates the affected Kiosk window after display metrics change. */
+const handleDisplayMetricsChanged = (
+  _event: Electron.Event,
+  display: Display
+) => {
+  scheduleDisplayReconciliation(String(display.id))
+}
+
 const startHeartbeatMonitor = () => {
   if (heartbeatInterval) {
     return
@@ -283,7 +281,9 @@ const startHeartbeatMonitor = () => {
     playerWindows.forEach((win) => {
       const last = heartbeatMap.get(win.webContents.id) ?? 0
       if (last > 0 && now - last > 15000) {
-        win.reload()
+        if (!win.isDestroyed()) {
+          win.reload()
+        }
       }
     })
   }, 5000)
@@ -347,85 +347,87 @@ const createControlWindow = () => {
   })
 }
 
-const createPlayerWindows = () => {
-  const displays = filterEnabledDisplays(
-    playbackConfig,
-    screen.getAllDisplays()
-  )
+const createPlayerWindow = (display: Display): BrowserWindow => {
+  const displayId = String(display.id)
   const shouldExitPlayerWindows = createPlayerExitShortcutDetector()
 
-  playerWindows = displays.map((display) => {
-    const win = createWindow(
-      'player',
-      {
-        x: display.bounds.x,
-        y: display.bounds.y,
-        width: display.bounds.width,
-        height: display.bounds.height,
-        show: false,
-        frame: false,
-        kiosk: true,
-        fullscreenable: false,
-        autoHideMenuBar: true,
-        resizable: false,
-        movable: false,
-        minimizable: false,
-        maximizable: false,
-        backgroundColor: '#000000',
-        alwaysOnTop: true,
-        roundedCorners: false
-      },
-      {
-        displayId: String(display.id)
-      }
-    )
+  const win = createWindow(
+    'player',
+    {
+      x: display.bounds.x,
+      y: display.bounds.y,
+      width: display.bounds.width,
+      height: display.bounds.height,
+      show: false,
+      frame: false,
+      kiosk: true,
+      fullscreenable: false,
+      autoHideMenuBar: true,
+      resizable: false,
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      backgroundColor: '#000000',
+      alwaysOnTop: true,
+      roundedCorners: false
+    },
+    {
+      displayId
+    }
+  )
 
-    win.setMenuBarVisibility(false)
-    win.on('closed', () => {
-      playerWindows = playerWindows.filter((item) => item !== win)
-      if (playerWindows.length === 0) {
-        stopHeartbeatMonitor()
-      }
-      updateStatusTrayMenu()
-    })
-
-    win.webContents.on('render-process-gone', () => {
-      win.reload()
-    })
-
-    win.webContents.once('did-finish-load', () => {
-      win.webContents.send('config:updated', playbackConfig)
-    })
-
-    win.webContents.on('before-input-event', (event, input) => {
-      if (!shouldBlockPlayerWindowEscape(input)) {
-        return
-      }
-
-      event.preventDefault()
-      if (shouldExitPlayerWindows(input)) {
-        void exitPlayerMode()
-      }
-    })
-
-    win.once('ready-to-show', () => {
-      applyPlayerWindowPresentation(win)
-    })
-
-    win.webContents.on('unresponsive', () => {
-      win.reload()
-    })
-
-    win.webContents.on('responsive', () => {
-      heartbeatMap.set(win.webContents.id, Date.now())
-    })
-
-    heartbeatMap.set(win.webContents.id, Date.now())
-
-    return win
+  const webContentsId = win.webContents.id
+  playerWindows.set(displayId, win)
+  win.setMenuBarVisibility(false)
+  win.on('closed', () => {
+    if (playerWindows.get(displayId) === win) {
+      playerWindows.delete(displayId)
+    }
+    heartbeatMap.delete(webContentsId)
+    if (playerWindows.size === 0) {
+      stopHeartbeatMonitor()
+    }
+    updateStatusTrayMenu()
   })
 
-  startHeartbeatMonitor()
+  win.webContents.on('render-process-gone', () => {
+    if (!win.isDestroyed()) {
+      win.reload()
+    }
+  })
+
+  win.webContents.once('did-finish-load', () => {
+    win.webContents.send('config:updated', playbackConfig)
+  })
+
+  win.webContents.on('before-input-event', (event, input) => {
+    if (!shouldBlockPlayerWindowEscape(input)) {
+      return
+    }
+
+    event.preventDefault()
+    if (shouldExitPlayerWindows(input)) {
+      void exitPlayerMode()
+    }
+  })
+
+  win.once('ready-to-show', () => {
+    applyPlayerWindowPresentation(win)
+  })
+
+  win.webContents.on('unresponsive', () => {
+    if (!win.isDestroyed()) {
+      win.reload()
+    }
+  })
+
+  win.webContents.on('responsive', () => {
+    heartbeatMap.set(win.webContents.id, Date.now())
+  })
+
+  heartbeatMap.set(win.webContents.id, Date.now())
+
+  return win
 }
 
 /** Resolves once Electron has emitted a closed event for the target window. */
@@ -450,14 +452,84 @@ const closePlayerWindow = async (win: BrowserWindow): Promise<void> => {
   await waitForWindowClosed(win)
 }
 
+/**
+ * Reconciles Player windows against the current connected and enabled displays.
+ */
+const reconcilePlayerWindows = async (
+  recreateDisplayIds: ReadonlySet<string> = new Set()
+): Promise<void> => {
+  if (!playerModeActive) {
+    return
+  }
+
+  const displays = selectPlayerTargetDisplays(
+    playbackConfig,
+    screen.getAllDisplays(),
+    playerModeInitialDisplayIds
+  )
+  const displaysById = new Map(
+    displays.map((display) => [String(display.id), display])
+  )
+  const plan = planPlayerWindowReconciliation({
+    desiredDisplayIds: [...displaysById.keys()],
+    existingDisplayIds: [...playerWindows.keys()],
+    recreateDisplayIds
+  })
+
+  await Promise.all(
+    plan.closeDisplayIds.map(async (displayId) => {
+      const win = playerWindows.get(displayId)
+      if (win) {
+        await closePlayerWindow(win)
+      }
+    })
+  )
+
+  if (!playerModeActive) {
+    return
+  }
+
+  plan.createDisplayIds.forEach((displayId) => {
+    const display = displaysById.get(displayId)
+    if (display && !playerWindows.has(displayId)) {
+      createPlayerWindow(display)
+    }
+  })
+
+  if (playerWindows.size > 0) {
+    startHeartbeatMonitor()
+  } else {
+    stopHeartbeatMonitor()
+  }
+
+  updateStatusTrayMenu()
+}
+
+/**
+ * Serializes Player-window reconciliation so hot-plug bursts cannot overlap.
+ */
+const queuePlayerWindowReconciliation = (
+  recreateDisplayIds: ReadonlySet<string> = new Set()
+): Promise<void> => {
+  const requestedRecreateIds = new Set(recreateDisplayIds)
+
+  playerWindowReconcileTask = playerWindowReconcileTask
+    .catch((error) => {
+      console.error('Failed to reconcile Player windows.', error)
+    })
+    .then(() => reconcilePlayerWindows(requestedRecreateIds))
+
+  return playerWindowReconcileTask
+}
+
 /** Closes every player window after leaving kiosk presentation mode. */
 const closePlayerWindows = async (): Promise<void> => {
   if (closePlayerWindowsTask) {
     return closePlayerWindowsTask
   }
 
-  const windows = playerWindows
-  playerWindows = []
+  const windows = [...playerWindows.values()]
+  playerWindows.clear()
   stopHeartbeatMonitor()
   updateStatusTrayMenu()
 
@@ -489,13 +561,18 @@ const restoreControlWindow = () => {
 }
 
 const exitPlayerMode = async () => {
+  playerModeActive = false
+  playerModeInitialDisplayIds.clear()
+  await playerWindowReconcileTask.catch((error) => {
+    console.error('Failed to finish Player-window reconciliation.', error)
+  })
   await closePlayerWindows()
   restoreControlWindow()
 }
 
 const getStatus = (): PlayerStatus => ({
-  running: playerWindows.length > 0,
-  displayCount: playerWindows.length
+  running: playerModeActive,
+  displayCount: playerWindows.size
 })
 
 /** Starts player windows if kiosk mode is not already running. */
@@ -504,10 +581,14 @@ const startPlayerMode = async (): Promise<PlayerStatus> => {
     await closePlayerWindowsTask
   }
 
-  if (playerWindows.length === 0) {
+  if (!playerModeActive) {
     playbackConfig = await loadPlaybackConfig()
+    playerModeActive = true
+    playerModeInitialDisplayIds = new Set(
+      screen.getAllDisplays().map((display) => String(display.id))
+    )
     console.log('Starting player windows...')
-    createPlayerWindows()
+    await queuePlayerWindowReconciliation()
     broadcastConfig(playbackConfig)
     updateStatusTrayMenu()
   }
@@ -521,10 +602,13 @@ const updateStatusTrayMenu = () => {
     return
   }
 
-  const isRunning = playerWindows.length > 0
+  const isRunning = playerModeActive
+  const displayCount = playerWindows.size
   statusTray.setToolTip(
     isRunning
-      ? `${APP_NAME} - Kiosk running on ${playerWindows.length} display(s)`
+      ? displayCount > 0
+        ? `${APP_NAME} - Kiosk running on ${displayCount} display(s)`
+        : `${APP_NAME} - Kiosk waiting for an enabled display`
       : `${APP_NAME} - Kiosk ready`
   )
   statusTray.setContextMenu(
@@ -614,9 +698,8 @@ const updateConfig = async (next: PlayerConfig): Promise<PlayerConfig> => {
   editableConfig = await saveConfig(normalized)
   playbackConfig = await loadPlaybackConfig()
 
-  if (playerWindows.length > 0) {
-    await closePlayerWindows()
-    createPlayerWindows()
+  if (playerModeActive) {
+    await queuePlayerWindowReconciliation()
   }
 
   broadcastConfig(playbackConfig)
@@ -656,9 +739,9 @@ if (hasSingleInstanceLock) {
     }
     flushQueuedDeepLinkCommands()
 
-    screen.on('display-added', broadcastDisplays)
-    screen.on('display-removed', broadcastDisplays)
-    screen.on('display-metrics-changed', broadcastDisplays)
+    screen.on('display-added', handleDisplayTopologyChanged)
+    screen.on('display-removed', handleDisplayTopologyChanged)
+    screen.on('display-metrics-changed', handleDisplayMetricsChanged)
   })
 }
 
@@ -675,9 +758,15 @@ app.on('activate', () => {
 })
 
 app.on('will-quit', () => {
-  screen.removeListener('display-added', broadcastDisplays)
-  screen.removeListener('display-removed', broadcastDisplays)
-  screen.removeListener('display-metrics-changed', broadcastDisplays)
+  playerModeActive = false
+  if (displayChangeTimer) {
+    clearTimeout(displayChangeTimer)
+    displayChangeTimer = null
+  }
+  pendingRecreateDisplayIds.clear()
+  screen.removeListener('display-added', handleDisplayTopologyChanged)
+  screen.removeListener('display-removed', handleDisplayTopologyChanged)
+  screen.removeListener('display-metrics-changed', handleDisplayMetricsChanged)
   statusTray?.destroy()
   statusTray = null
 })
@@ -698,12 +787,6 @@ ipcMain.handle(
     pickFiles(options?.kind ?? 'media')
 )
 
-ipcMain.handle(
-  'assets:cache-remote',
-  async (_event, payload: { url: string; type: AssetType }) =>
-    cacheRemoteAsset(payload.url, payload.type)
-)
-
 ipcMain.handle('displays:list', async () => listDisplays())
 
 ipcMain.handle('player:start', async () => startPlayerMode())
@@ -718,3 +801,11 @@ ipcMain.handle('player:status', async () => getStatus())
 ipcMain.on('player:heartbeat', (event) => {
   heartbeatMap.set(event.sender.id, Date.now())
 })
+
+ipcMain.handle('system:get-launch-at-login', async () =>
+  launchAtLoginController.get()
+)
+
+ipcMain.handle('system:set-launch-at-login', async (_event, enabled: boolean) =>
+  launchAtLoginController.set(enabled)
+)

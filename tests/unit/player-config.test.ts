@@ -74,6 +74,17 @@ describe('player-config helpers', () => {
     expect(next.displays['1'].playlists).not.toBe(config.playlists)
   })
 
+  it('can keep displays connected after initial load disabled by default', () => {
+    const config = ensureDisplayConfigs(createDefaultConfig(), [displays[0]])
+
+    const next = ensureDisplayConfigs(config, displays, {
+      newDisplayEnabled: false
+    })
+
+    expect(next.displays['1'].enabled).toBe(true)
+    expect(next.displays['2'].enabled).toBe(false)
+  })
+
   it('returns the active playlist by id', () => {
     const config = createDefaultConfig()
     config.playlists = [

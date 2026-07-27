@@ -8,6 +8,11 @@ import {
 } from '../src/shared/config-store'
 import type { ConfigDiagnostics } from '../src/shared/ipc'
 import type { PlayerConfig } from '../src/shared/types'
+import {
+  assertConfigLocalAssetsAuthorized,
+  migrateConfigLocalAssets
+} from './local-asset-config'
+import { getLocalAssetRegistry } from './local-assets'
 
 export type ConfigRepository = {
   getDiagnostics: () => Promise<ConfigDiagnostics>
@@ -27,19 +32,23 @@ const createConfigStore = (): Store<StoredConfig> =>
 /** Normalizes raw store contents into the current config shape. */
 const createConfigReader = (
   store: Store<StoredConfig>
-): (() => StoredConfig) => {
-  return () => {
+): (() => Promise<StoredConfig>) => {
+  return async () => {
     const raw = store.store
     const normalized = coerceStoredConfig(raw)
+    const migrated = await migrateConfigLocalAssets(
+      normalized,
+      getLocalAssetRegistry()
+    )
 
     if (
       !existsSync(store.path) ||
-      JSON.stringify(raw) !== JSON.stringify(normalized)
+      JSON.stringify(raw) !== JSON.stringify(migrated)
     ) {
-      store.store = normalized
+      store.store = migrated
     }
 
-    return normalized
+    return migrated
   }
 }
 
@@ -57,10 +66,11 @@ export const createConfigRepository = (): ConfigRepository => {
       configPath: store.path
     }),
     getConfigPath,
-    loadConfig: async () => readFromStore(),
-    loadPlaybackConfig: async () => readFromStore(),
+    loadConfig: readFromStore,
+    loadPlaybackConfig: readFromStore,
     saveConfig: async (config) => {
       const next = cloneStoredConfig(config)
+      assertConfigLocalAssetsAuthorized(next, getLocalAssetRegistry())
       store.store = next
       return next
     }

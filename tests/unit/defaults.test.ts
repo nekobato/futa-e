@@ -103,6 +103,75 @@ describe('config coercion', () => {
     expect(config.playlists[0]?.items[2]?.durationSec).toBeUndefined()
   })
 
+  it('preserves renderer-safe local asset display names', () => {
+    const config = coerceConfig({
+      version: 1,
+      activePlaylistId: 'playlist-1',
+      playlists: [
+        {
+          id: 'playlist-1',
+          name: 'プレイリスト 1',
+          perDisplay: false,
+          loop: true,
+          shuffle: false,
+          defaultDurationSec: 10,
+          webTimeoutSec: 8,
+          items: [
+            {
+              id: 'web',
+              type: 'web',
+              src: 'https://example.com',
+              sourceName: 'page.html',
+              fallbackSrc: '11111111-1111-4111-8111-111111111111',
+              fallbackName: 'fallback.png'
+            }
+          ]
+        }
+      ],
+      displays: {},
+      updatedAt: '2026-03-18T00:00:00.000Z'
+    })
+
+    expect(config.playlists[0]?.items[0]).toMatchObject({
+      sourceName: 'page.html',
+      fallbackName: 'fallback.png'
+    })
+  })
+
+  it('migrates legacy app-managed cache entries back to their remote URL', () => {
+    const config = coerceConfig({
+      version: 1,
+      activePlaylistId: 'playlist-1',
+      playlists: [
+        {
+          id: 'playlist-1',
+          name: 'プレイリスト 1',
+          perDisplay: false,
+          loop: true,
+          shuffle: false,
+          defaultDurationSec: 10,
+          webTimeoutSec: 8,
+          items: [
+            {
+              id: 'legacy-cached-image',
+              type: 'image',
+              src: '/Users/demo/Library/Application Support/Futa E/cache/image.png',
+              originUrl: 'https://example.com/image.png'
+            }
+          ]
+        }
+      ],
+      displays: {},
+      updatedAt: '2026-03-18T00:00:00.000Z'
+    })
+
+    expect(config.playlists[0]?.items[0]).toMatchObject({
+      id: 'legacy-cached-image',
+      src: 'https://example.com/image.png'
+    })
+    expect(config.playlists[0]?.items[0]).not.toHaveProperty('originUrl')
+  })
+
   it('converts legacy playlist and overlay settings into playlists', () => {
     const config = coerceConfig({
       version: 1,
