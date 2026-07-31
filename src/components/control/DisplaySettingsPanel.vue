@@ -12,7 +12,7 @@
           class="display-summary"
         >
           <div class="display-icon" aria-hidden="true">
-            <i class="pi pi-desktop"></i>
+            <ElIcon><Monitor /></ElIcon>
           </div>
 
           <div class="display-copy">
@@ -23,22 +23,15 @@
           </div>
 
           <div class="display-summary-actions">
-            <Tag
-              :value="display.isPrimary ? 'メイン' : '画面'"
-              severity="secondary"
-            />
+            <ElTag type="info">
+              {{ display.isPrimary ? 'メイン' : '画面' }}
+            </ElTag>
             <div class="display-toggle">
               <label :for="displayEnabledInputId(display.id)">有効</label>
-              <ToggleSwitch
-                :inputId="displayEnabledInputId(display.id)"
-                :modelValue="isDisplayEnabled(display.id)"
-                @change="
-                  emit(
-                    'toggle-display',
-                    display.id,
-                    toggleSwitchChecked($event)
-                  )
-                "
+              <ElSwitch
+                :id="displayEnabledInputId(display.id)"
+                :model-value="isDisplayEnabled(display.id)"
+                @update:model-value="handleDisplayToggle(display.id, $event)"
               />
             </div>
           </div>
@@ -51,6 +44,7 @@
 </template>
 
 <script setup lang="ts">
+import { Monitor } from '@element-plus/icons-vue'
 import type { DisplayInfo, PlayerConfig } from '../../shared/types'
 
 const props = defineProps<{
@@ -70,9 +64,13 @@ const displayEnabledInputId = (displayId: string) =>
 const isDisplayEnabled = (displayId: string) =>
   props.displays[displayId]?.enabled ?? false
 
-/** Reads the checked state from a PrimeVue toggle change event. */
-const toggleSwitchChecked = (event: Event): boolean =>
-  Boolean((event.target as HTMLInputElement | null)?.checked)
+/** Narrows Element Plus' configurable switch value to this boolean model. */
+const handleDisplayToggle = (
+  displayId: string,
+  enabled: string | number | boolean
+) => {
+  emit('toggle-display', displayId, enabled === true)
+}
 </script>
 
 <style lang="scss">
@@ -165,7 +163,7 @@ const toggleSwitchChecked = (event: Event): boolean =>
     display: grid;
     place-items: center;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--surface-strong), white 45%);
+    background: color-mix(in srgb, var(--surface-strong), var(--paper-2) 45%);
     font-size: 18px;
     color: color-mix(in srgb, var(--ink), var(--accent) 22%);
   }
@@ -185,7 +183,7 @@ const toggleSwitchChecked = (event: Event): boolean =>
     padding: 8px 12px;
     border-radius: 999px;
     border: 1px solid var(--line-subtle);
-    background: color-mix(in srgb, var(--surface-strong), white 42%);
+    background: color-mix(in srgb, var(--surface-strong), var(--paper-2) 42%);
 
     label {
       font-weight: 600;

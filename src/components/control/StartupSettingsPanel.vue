@@ -23,12 +23,12 @@
       </div>
 
       <div class="startup-settings-control">
-        <ToggleSwitch
-          :inputId="launchAtLoginInputId"
-          :modelValue="settings.enabled"
+        <ElSwitch
+          :id="launchAtLoginInputId"
+          :model-value="settings.enabled"
           :disabled="!settings.supported || pending"
           :aria-describedby="launchAtLoginDescriptionIds"
-          @change="emit('update', toggleSwitchChecked($event))"
+          @update:model-value="handleUpdate($event)"
         />
         <span
           v-if="pending"
@@ -67,9 +67,10 @@ const launchAtLoginDescriptionIds = computed(() =>
     : `${launchAtLoginDescriptionId} ${launchAtLoginSupportId}`
 )
 
-/** Reads the checked state from a PrimeVue toggle change event. */
-const toggleSwitchChecked = (event: Event): boolean =>
-  Boolean((event.target as HTMLInputElement | null)?.checked)
+/** Narrows Element Plus' configurable switch value to this boolean model. */
+const handleUpdate = (enabled: string | number | boolean) => {
+  emit('update', enabled === true)
+}
 </script>
 
 <style lang="scss">
@@ -133,7 +134,7 @@ const toggleSwitchChecked = (event: Event): boolean =>
   }
 
   &-error {
-    color: var(--p-red-600, #b42318);
+    color: var(--danger, #b42318);
   }
 }
 </style>

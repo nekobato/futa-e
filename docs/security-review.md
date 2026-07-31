@@ -157,7 +157,7 @@ Severity: Medium
 3. `script-src`をbundled scriptだけに限定し、`unsafe-eval`をproductionで許可しない。
 4. `frame-src`をHTTPSへ限定する。
 5. `img-src`と`media-src`には、必要な`self`、`https:`、`blob:`、`data:`、`futae-media:`だけを列挙する。
-6. PrimeVue/Viteが必要とするstyleとdevelopment server接続は、production CSPとdevelopment CSPを分けて評価する。
+6. Element Plus/Viteが必要とするstyleとdevelopment server接続は、production CSPとdevelopment CSPを分けて評価する。
 
 parent documentのCSPはiframeへ読み込めるoriginを制限するが、remote document内のscript policyを上書きしない。remote document自体のCSPは配信元が管理するため、アプリ側の主な境界はiframe sandbox、URL validation、permission handler、navigation制限である。
 

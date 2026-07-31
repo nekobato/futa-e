@@ -9,13 +9,15 @@
           </p>
         </div>
 
-        <Button
-          label="追加"
-          icon="pi pi-plus"
+        <ElButton
+          :icon="Plus"
+          type="primary"
           size="small"
           data-testid="playlist-item-add-button"
           @click="openDraftDialog"
-        />
+        >
+          追加
+        </ElButton>
       </div>
 
       <p
@@ -25,136 +27,135 @@
         {{ emptyMessage }}
       </p>
 
-      <Timeline
+      <ElTimeline
         v-else
-        :value="timelineEntries"
         data-testid="playlist-item-timeline"
         class="playlist-list playlist-timeline"
       >
-        <template #opposite="slotProps">
-          <div class="playlist-step">
-            <span class="playlist-step-index">
-              {{ timelineIndexLabel(slotProps.item.index) }}
-            </span>
-            <span class="playlist-step-copy">
-              {{ playbackMetaLabel(slotProps.item.item) }}
-            </span>
-          </div>
-        </template>
+        <ElTimelineItem
+          v-for="entry in timelineEntries"
+          :key="entry.item.id"
+          hide-timestamp
+        >
+          <div class="timeline-entry">
+            <div class="playlist-step">
+              <span class="playlist-step-index">
+                {{ timelineIndexLabel(entry.index) }}
+              </span>
+              <span class="playlist-step-copy">
+                {{ playbackMetaLabel(entry.item) }}
+              </span>
+            </div>
 
-        <template #marker="slotProps">
-          <span
-            class="playlist-marker"
-            :class="`is-${slotProps.item.item.type}`"
-            aria-hidden="true"
-          >
-            <i :class="itemIcon(slotProps.item.item.type)"></i>
-          </span>
-        </template>
+            <div class="marker-track" aria-hidden="true">
+              <span class="playlist-marker" :class="`is-${entry.item.type}`">
+                <component :is="itemIcon(entry.item.type)" />
+              </span>
+            </div>
 
-        <template #content="slotProps">
-          <div class="playlist-item">
-            <div class="playlist-item-header">
-              <div class="playlist-item-copy">
-                <strong>{{ itemLabel(slotProps.item.item) }}</strong>
-                <div class="playlist-meta">
-                  {{ itemSourceLabel(slotProps.item.item) }}
+            <div class="playlist-item">
+              <div class="playlist-item-header">
+                <div class="playlist-item-copy">
+                  <strong>{{ itemLabel(entry.item) }}</strong>
+                  <div class="playlist-meta">
+                    {{ itemSourceLabel(entry.item) }}
+                  </div>
+                  <div v-if="itemStateLabel(entry.item)" class="playlist-meta">
+                    {{ itemStateLabel(entry.item) }}
+                  </div>
                 </div>
-                <div
-                  v-if="itemStateLabel(slotProps.item.item)"
-                  class="playlist-meta"
+                <ElTag
+                  v-if="getItemPlaybackMode(entry.item) === 'forever'"
+                  type="info"
                 >
-                  {{ itemStateLabel(slotProps.item.item) }}
-                </div>
+                  無期限
+                </ElTag>
               </div>
-              <Tag
-                v-if="getItemPlaybackMode(slotProps.item.item) === 'forever'"
-                value="無期限"
-                severity="info"
-              />
-            </div>
 
-            <div class="playlist-item-actions">
-              <Button
-                icon="pi pi-pencil"
-                text
-                severity="secondary"
-                aria-label="項目を編集"
-                @click="openEditDialog(slotProps.item.index)"
-              />
-              <Button
-                v-if="!singleItemMode"
-                icon="pi pi-arrow-up"
-                text
-                severity="secondary"
-                aria-label="項目を上へ移動"
-                :disabled="slotProps.item.index === 0"
-                @click="moveItem(slotProps.item.index, -1)"
-              />
-              <Button
-                v-if="!singleItemMode"
-                icon="pi pi-arrow-down"
-                text
-                severity="secondary"
-                aria-label="項目を下へ移動"
-                :disabled="slotProps.item.index === playlist.length - 1"
-                @click="moveItem(slotProps.item.index, 1)"
-              />
-              <Button
-                icon="pi pi-trash"
-                text
-                severity="danger"
-                aria-label="項目を削除"
-                @click="removeItem(slotProps.item.index)"
-              />
+              <div class="playlist-item-actions">
+                <ElButton
+                  :icon="EditPen"
+                  text
+                  circle
+                  type="info"
+                  aria-label="項目を編集"
+                  @click="openEditDialog(entry.index)"
+                />
+                <ElButton
+                  v-if="!singleItemMode"
+                  :icon="ArrowUp"
+                  text
+                  circle
+                  type="info"
+                  aria-label="項目を上へ移動"
+                  :disabled="entry.index === 0"
+                  @click="moveItem(entry.index, -1)"
+                />
+                <ElButton
+                  v-if="!singleItemMode"
+                  :icon="ArrowDown"
+                  text
+                  circle
+                  type="info"
+                  aria-label="項目を下へ移動"
+                  :disabled="entry.index === playlist.length - 1"
+                  @click="moveItem(entry.index, 1)"
+                />
+                <ElButton
+                  :icon="Delete"
+                  text
+                  circle
+                  type="danger"
+                  aria-label="項目を削除"
+                  @click="removeItem(entry.index)"
+                />
+              </div>
             </div>
           </div>
-        </template>
-      </Timeline>
+        </ElTimelineItem>
+      </ElTimeline>
     </section>
 
-    <Dialog
-      v-model:visible="isDraftDialogVisible"
-      modal
-      :header="dialogTitle"
-      :style="{ width: '42rem' }"
-      :breakpoints="{ '960px': '92vw' }"
+    <ElDialog
+      v-model="isDraftDialogVisible"
+      :title="dialogTitle"
+      width="min(42rem, calc(100vw - 32px))"
+      :close-on-click-modal="false"
       class="playlist-dialog"
+      header-class="playlist-dialog-header"
+      body-class="playlist-dialog-body"
+      footer-class="playlist-dialog-footer"
     >
       <div class="playlist-composer">
         <div class="field">
           <label :id="typeLabelId">種類</label>
-          <SelectButton
-            :modelValue="draftType"
+          <ElSegmented
+            :id="typeSegmentedId"
+            :model-value="draftType"
             :options="typeOptions"
-            optionLabel="label"
-            optionValue="value"
-            :allowEmpty="false"
-            :ariaLabelledby="typeLabelId"
+            :aria-labelledby="typeLabelId"
             size="small"
             class="choice-group"
-            @update:modelValue="handleDraftTypeChange"
+            @update:model-value="handleDraftTypeChange"
           />
         </div>
 
         <div v-if="draftType !== 'web'" class="field">
           <label :id="sourceModeLabelId">入力方法</label>
-          <SelectButton
-            :modelValue="draftSourceMode"
+          <ElSegmented
+            :id="sourceModeSegmentedId"
+            :model-value="draftSourceMode"
             :options="sourceModeOptions"
-            optionLabel="label"
-            optionValue="value"
-            :allowEmpty="false"
-            :ariaLabelledby="sourceModeLabelId"
+            :aria-labelledby="sourceModeLabelId"
             size="small"
             class="choice-group"
-            @update:modelValue="handleDraftSourceModeChange"
+            @update:model-value="handleDraftSourceModeChange"
           />
         </div>
 
         <div v-if="draftSourceMode === 'url'" class="field">
           <label :for="urlInputId">URL</label>
-          <InputText
+          <ElInput
             :id="urlInputId"
             v-model="urlInput"
             type="url"
@@ -188,37 +189,32 @@
           </div>
 
           <div class="row">
-            <Button
-              label="ファイルを選択"
-              icon="pi pi-images"
-              size="small"
-              severity="secondary"
-              @click="pickDraftFiles"
-            />
-            <Button
+            <ElButton :icon="Files" size="small" plain @click="pickDraftFiles">
+              ファイルを選択
+            </ElButton>
+            <ElButton
               v-if="draftAssets.length > 0"
-              label="クリア"
-              icon="pi pi-times"
+              :icon="Close"
               size="small"
-              severity="secondary"
               text
               @click="clearDraftFiles"
-            />
+            >
+              クリア
+            </ElButton>
           </div>
         </div>
 
         <div v-if="showDraftDuration" class="field">
           <label :id="playbackModeLabelId">表示方法</label>
-          <SelectButton
-            :modelValue="draftPlaybackMode"
+          <ElSegmented
+            :id="playbackModeSegmentedId"
+            :model-value="draftPlaybackMode"
             :options="playbackModeOptions"
-            optionLabel="label"
-            optionValue="value"
-            :allowEmpty="false"
-            :ariaLabelledby="playbackModeLabelId"
+            :aria-labelledby="playbackModeLabelId"
+            :aria-describedby="playbackModeNoteId"
             size="small"
             class="choice-group playback-choice-group"
-            @update:modelValue="handleDraftPlaybackModeChange"
+            @update:model-value="handleDraftPlaybackModeChange"
           />
           <p :id="playbackModeNoteId" class="surface-note">
             {{ playbackModeNote }}
@@ -230,23 +226,24 @@
           class="field"
         >
           <label :for="urlDurationInputId">秒数</label>
-          <InputNumber
-            :inputId="urlDurationInputId"
-            v-model="urlDuration"
+          <ElInputNumber
+            :id="urlDurationInputId"
+            :model-value="urlDuration"
             size="small"
             :min="draftDurationMin"
             :max="36000"
             :aria-describedby="playbackModeNoteId"
+            @update:model-value="urlDuration = $event ?? null"
             @blur="commitDraftDuration"
           />
         </div>
 
         <div v-if="draftType === 'video'" class="field-inline">
           <label :for="draftMuteInputId">ミュート</label>
-          <ToggleSwitch
-            :inputId="draftMuteInputId"
-            :modelValue="draftMute"
-            @change="draftMute = toggleSwitchChecked($event)"
+          <ElSwitch
+            :id="draftMuteInputId"
+            :model-value="draftMute"
+            @update:model-value="draftMute = $event === true"
           />
         </div>
 
@@ -260,11 +257,10 @@
               Web の読込待機中または失敗時だけ、代わりの画像を表示します。
             </p>
           </div>
-          <Checkbox
-            v-model="draftFallbackEnabled"
-            :inputId="draftFallbackEnabledId"
-            binary
-            @update:modelValue="handleDraftFallbackToggle"
+          <ElCheckbox
+            :id="draftFallbackEnabledId"
+            :model-value="draftFallbackEnabled"
+            @update:model-value="handleDraftFallbackToggle($event === true)"
           />
         </div>
 
@@ -278,22 +274,23 @@
           </div>
 
           <div class="row">
-            <Button
-              label="画像を選択"
-              icon="pi pi-image"
+            <ElButton
+              :icon="Picture"
               size="small"
-              severity="secondary"
+              plain
               @click="pickDraftFallback"
-            />
-            <Button
+            >
+              画像を選択
+            </ElButton>
+            <ElButton
               v-if="draftFallback"
-              label="クリア"
-              icon="pi pi-times"
+              :icon="Close"
               size="small"
-              severity="secondary"
               text
               @click="clearDraftFallback"
-            />
+            >
+              クリア
+            </ElButton>
           </div>
         </div>
 
@@ -307,27 +304,36 @@
 
       <template #footer>
         <div class="playlist-dialog-actions">
-          <Button
-            label="キャンセル"
-            severity="secondary"
-            text
-            @click="closeDraftDialog"
-          />
-          <Button
-            :label="dialogSubmitLabel"
-            icon="pi pi-check"
+          <ElButton text @click="closeDraftDialog">キャンセル</ElButton>
+          <ElButton
+            :icon="Check"
+            type="primary"
             :disabled="!canSubmitDraft"
             @click="submitDraft"
-          />
+          >
+            {{ dialogSubmitLabel }}
+          </ElButton>
         </div>
       </template>
-    </Dialog>
+    </ElDialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  Close,
+  Delete,
+  EditPen,
+  Files,
+  Monitor,
+  Picture,
+  Plus,
+  VideoCamera
+} from '@element-plus/icons-vue'
 import { computed, ref } from 'vue'
-import Timeline from 'primevue/timeline'
 import { getFutaeApi } from '../shared/api'
 import {
   getItemPlaybackMode,
@@ -382,8 +388,11 @@ const urlDurationInputId = createId()
 const draftFallbackEnabledId = createId()
 const draftMuteInputId = createId()
 const typeLabelId = createId()
+const typeSegmentedId = createId()
 const sourceModeLabelId = createId()
+const sourceModeSegmentedId = createId()
 const playbackModeLabelId = createId()
+const playbackModeSegmentedId = createId()
 const playbackModeNoteId = createId()
 const webUrlHintId = createId()
 const webUrlErrorId = createId()
@@ -466,10 +475,6 @@ const selectedAssetsLabel = computed(() => {
   return `${draftAssets.value.length} 件選択中`
 })
 
-/** Reads the checked state from a PrimeVue toggle change event. */
-const toggleSwitchChecked = (event: Event): boolean =>
-  Boolean((event.target as HTMLInputElement | null)?.checked)
-
 /** Decorates playlist items with indices for the Timeline component. */
 const timelineEntries = computed<PlaylistTimelineEntry[]>(() =>
   props.playlist.map((item, index) => ({
@@ -502,8 +507,13 @@ const canSubmitDraft = computed(() =>
     : draftAssets.value.length > 0
 )
 
-const itemIcon = (type: AssetType) =>
-  ({ image: 'pi pi-image', video: 'pi pi-video', web: 'pi pi-globe' })[type]
+const itemIcons = {
+  image: Picture,
+  video: VideoCamera,
+  web: Monitor
+}
+
+const itemIcon = (type: AssetType) => itemIcons[type]
 
 const timelineIndexLabel = (index: number) => String(index + 1).padStart(2, '0')
 
@@ -931,7 +941,7 @@ const removeItem = (index: number) => {
 
   .validation-error {
     margin: 0;
-    color: var(--p-red-600, #b42318);
+    color: var(--el-color-danger);
     font-size: 12.5px;
     line-height: 1.5;
   }
@@ -962,9 +972,7 @@ const removeItem = (index: number) => {
       letter-spacing: 0.01em;
     }
 
-    :where(.p-inputnumber, .p-select, .p-inputtext),
-    .p-inputnumber-input,
-    .p-select-label {
+    :where(.el-input, .el-input-number) {
       width: 100%;
     }
   }
@@ -1010,7 +1018,8 @@ const removeItem = (index: number) => {
     width: 100%;
   }
 
-  :where(.p-button) {
+  :where(.el-button) {
+    margin-left: 0;
     white-space: nowrap;
   }
 }
@@ -1050,14 +1059,25 @@ const removeItem = (index: number) => {
 }
 
 .choice-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  --el-segmented-bg-color: color-mix(
+    in srgb,
+    var(--surface-strong),
+    var(--panel) 18%
+  );
+  --el-segmented-item-selected-bg-color: var(--surface-strong);
+  --el-segmented-item-selected-color: var(--ink);
 
-  &:where(.p-selectbutton) {
-    gap: 0;
-    align-self: flex-start;
-  }
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.choice-group .el-segmented__item-selected {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.choice-group .el-segmented__item-selected.is-focus-visible::before {
+  outline-color: var(--focus-line);
+  box-shadow: 0 0 0 4px var(--focus-ring);
 }
 
 .playlist-list {
@@ -1071,43 +1091,49 @@ const removeItem = (index: number) => {
   display: block;
   width: 100%;
 
-  .p-timeline-event {
-    width: 100%;
-    align-items: flex-start;
+  &.el-timeline {
+    padding-left: 0;
   }
 
-  .p-timeline-event-opposite {
-    --p-timeline-vertical-event-content-padding: 0 4px;
-
-    flex: 0 0 auto;
-    min-width: 0;
-    padding: 4px 0 20px;
+  .el-timeline-item__tail,
+  .el-timeline-item__node {
+    display: none;
   }
 
-  .p-timeline-event-separator {
-    flex: 0 0 48px;
-    margin: 0 14px 0 0;
+  .el-timeline-item.is-start .el-timeline-item__wrapper {
+    position: static;
+    top: 0;
+    padding-left: 0;
   }
+}
 
-  .p-timeline-event-marker {
-    width: auto;
-    height: auto;
-    background: transparent;
-    border: 0;
-    box-shadow: none;
-  }
+.timeline-entry {
+  display: grid;
+  grid-template-columns: minmax(96px, 128px) 62px minmax(0, 1fr);
+  align-items: stretch;
+  width: 100%;
+}
 
-  .p-timeline-event-connector {
+.marker-track {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 34px;
+
+  &::after {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    top: 34px;
+    bottom: -20px;
     width: 2px;
     background: color-mix(in srgb, var(--line-strong), var(--accent) 26%);
   }
+}
 
-  .p-timeline-event-content {
-    --p-timeline-vertical-event-content-padding: 0;
-
-    flex: 1 1 auto;
-    min-width: 0;
-  }
+.playlist-timeline .el-timeline-item:last-child .marker-track::after {
+  display: none;
 }
 
 .playlist-item {
@@ -1119,18 +1145,20 @@ const removeItem = (index: number) => {
 }
 
 .playlist-dialog {
-  :where(.p-dialog-header) {
-    padding: 16px 18px 12px;
-  }
+  --el-dialog-padding-primary: 0;
+}
 
-  :where(.p-dialog-content) {
-    padding: 0 18px 8px;
-  }
+.playlist-dialog-header {
+  padding: 16px 18px 12px;
+}
 
-  :where(.p-dialog-footer) {
-    padding: 12px 18px 16px;
-    border-top: 1px solid var(--line-subtle);
-  }
+.playlist-dialog-body {
+  padding: 0 18px 8px;
+}
+
+.playlist-dialog-footer {
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--line-subtle);
 }
 
 .playlist-dialog-actions {
@@ -1150,7 +1178,7 @@ const removeItem = (index: number) => {
   align-items: flex-start;
   gap: 12px;
 
-  :where(.p-tag) {
+  :where(.el-tag) {
     flex: 0 0 auto;
   }
 
@@ -1170,6 +1198,8 @@ const removeItem = (index: number) => {
   display: grid;
   gap: 4px;
   justify-items: end;
+  align-self: start;
+  padding: 4px 0 20px;
   text-align: right;
 }
 
@@ -1187,29 +1217,49 @@ const removeItem = (index: number) => {
 }
 
 .playlist-marker {
+  position: relative;
+  z-index: 1;
   width: 34px;
   height: 34px;
   display: inline-grid;
   place-items: center;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--line-strong), white 20%);
+  border: 1px solid
+    color-mix(in srgb, var(--line-strong), var(--surface-strong) 20%);
   color: var(--ink);
   background: color-mix(in srgb, var(--surface-strong), var(--panel) 24%);
   box-shadow: 0 10px 24px color-mix(in srgb, var(--shadow), transparent 42%);
 
+  :where(svg) {
+    width: 16px;
+    height: 16px;
+  }
+
   &.is-image {
     color: color-mix(in srgb, var(--accent), var(--ink) 16%);
-    background: color-mix(in srgb, var(--accent-soft), white 28%);
+    background: color-mix(
+      in srgb,
+      var(--accent-soft),
+      var(--surface-strong) 28%
+    );
   }
 
   &.is-video {
-    color: color-mix(in srgb, var(--p-orange-700), var(--ink) 12%);
-    background: color-mix(in srgb, var(--accent-warm), white 32%);
+    color: color-mix(in srgb, var(--el-color-warning-dark-2), var(--ink) 12%);
+    background: color-mix(
+      in srgb,
+      var(--el-color-warning-light-9),
+      var(--accent-warm) 24%
+    );
   }
 
   &.is-web {
-    color: color-mix(in srgb, var(--p-sky-700), var(--ink) 12%);
-    background: color-mix(in srgb, var(--p-sky-100), white 22%);
+    color: color-mix(in srgb, var(--el-color-info-dark-2), var(--ink) 12%);
+    background: color-mix(
+      in srgb,
+      var(--el-color-info-light-9),
+      var(--surface-strong) 22%
+    );
   }
 }
 

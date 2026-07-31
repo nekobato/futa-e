@@ -1,6 +1,5 @@
 <template>
   <div class="app-shell" :class="{ 'is-player': view === 'player' }">
-    <Toast v-if="view !== 'player'" position="bottom-center" />
     <PlayerView v-if="view === 'player'" />
     <ControlView v-else />
   </div>
@@ -53,40 +52,38 @@ const view =
 }
 
 :root {
-  color-scheme: light;
   --font-body: 'Roboto', 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif;
   --font-display:
     'Quantico', 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif;
-  --ink: var(--p-text-color);
-  --muted: var(--p-text-muted-color);
-  --accent: var(--p-primary-color);
-  --accent-soft: color-mix(in srgb, var(--p-primary-100), white 38%);
-  --accent-warm: color-mix(in srgb, var(--p-orange-300), white 18%);
-  --paper: #eeede8;
-  --paper-2: #f4f3eb;
-  --panel: #f2f2e8;
-  --surface: #f6f5ef;
-  --surface-strong: #fcfbf6;
-  --panel-soft: color-mix(in srgb, var(--panel), white 34%);
-  --panel-soft-strong: color-mix(in srgb, var(--panel), white 54%);
-  --panel-soft-emphasis: color-mix(in srgb, var(--accent-soft), white 42%);
-  --line: color-mix(in srgb, var(--p-content-border-color), transparent 42%);
-  --line-strong: color-mix(
+  --ink: var(--qa-ink);
+  --muted: var(--qa-muted);
+  --accent: var(--qa-accent);
+  --accent-soft: var(--qa-accent-soft);
+  --accent-warm: var(--qa-accent-warm);
+  --paper: var(--qa-paper);
+  --paper-2: var(--qa-paper-raised);
+  --panel: var(--qa-panel);
+  --surface: var(--qa-surface);
+  --surface-strong: var(--qa-surface-strong);
+  --panel-soft: color-mix(in srgb, var(--panel), var(--surface-strong) 34%);
+  --panel-soft-strong: color-mix(
     in srgb,
-    var(--p-content-border-color),
-    var(--p-surface-700) 8%
+    var(--panel),
+    var(--surface-strong) 54%
   );
-  --line-subtle: color-mix(
+  --panel-soft-emphasis: color-mix(
     in srgb,
-    var(--p-content-border-color),
-    transparent 58%
+    var(--accent-soft),
+    var(--surface-strong) 42%
   );
-  --hero-glow: color-mix(in srgb, var(--p-primary-200), transparent 82%);
-  --warm-glow: color-mix(in srgb, var(--p-orange-200), transparent 88%);
-  --focus-line: var(--p-form-field-focus-border-color);
-  --focus-ring: color-mix(in srgb, var(--p-primary-300), transparent 72%);
-  --shadow: 0 28px 90px
-    color-mix(in srgb, var(--p-surface-950), transparent 90%);
+  --line: var(--qa-line);
+  --line-strong: var(--qa-line-strong);
+  --line-subtle: var(--qa-line-subtle);
+  --hero-glow: var(--qa-hero-glow);
+  --warm-glow: var(--qa-warm-glow);
+  --focus-line: var(--qa-focus-line);
+  --focus-ring: var(--qa-focus-ring);
+  --shadow: var(--qa-shadow);
   --radius: 26px;
   --radius-card: 18px;
   --gap: 24px;
@@ -105,11 +102,11 @@ body {
   background:
     radial-gradient(
       circle at 12% 14%,
-      color-mix(in srgb, var(--p-surface-0), transparent 22%),
+      color-mix(in srgb, var(--surface-strong), transparent 22%),
       transparent 55%
     ),
     radial-gradient(circle at 78% 8%, var(--warm-glow), transparent 38%),
-    linear-gradient(180deg, #ebeae5, #f3f2ec 28%, #efeee8);
+    linear-gradient(180deg, var(--paper), var(--paper-2) 28%, var(--panel));
   color: var(--ink);
 }
 

@@ -11,27 +11,27 @@
             <h3>一覧</h3>
 
             <div class="row playlist-pane-actions">
-              <Button
-                icon="pi pi-plus"
+              <ElButton
+                :icon="Plus"
                 size="small"
                 text
-                severity="secondary"
+                type="info"
                 aria-label="プレイリストを追加"
                 data-testid="playlist-add-button"
                 @click="emit('add-playlist')"
               />
-              <Button
-                icon="pi pi-copy"
+              <ElButton
+                :icon="CopyDocument"
                 size="small"
                 text
-                severity="secondary"
+                type="info"
                 aria-label="プレイリストを複製"
                 @click="emit('duplicate-selected-playlist')"
               />
-              <Button
-                icon="pi pi-trash"
+              <ElButton
+                :icon="Delete"
                 size="small"
-                severity="danger"
+                type="danger"
                 text
                 aria-label="プレイリストを削除"
                 :disabled="!canRemoveSelectedPlaylist"
@@ -58,16 +58,13 @@
               </div>
 
               <div class="playlist-summary-meta">
-                <Tag
+                <ElTag
                   v-if="playlist.id === config.activePlaylistId"
-                  value="使用中"
-                  severity="success"
-                />
-                <Tag
-                  v-if="playlist.perDisplay"
-                  value="個別設定"
-                  severity="secondary"
-                />
+                  type="success"
+                >
+                  使用中
+                </ElTag>
+                <ElTag v-if="playlist.perDisplay" type="info"> 個別設定 </ElTag>
               </div>
             </button>
           </div>
@@ -78,34 +75,34 @@
         <div class="playlist-detail-card">
           <div class="playlist-detail-bar">
             <div class="playlist-detail-actions">
-              <Tag
-                v-if="isSelectedPlaylistActive"
-                value="現在の再生対象"
-                severity="success"
-              />
-              <Button
+              <ElTag v-if="isSelectedPlaylistActive" type="success">
+                現在の再生対象
+              </ElTag>
+              <ElButton
                 v-else
-                label="再生対象にする"
-                icon="pi pi-check"
+                :icon="Check"
                 size="small"
-                severity="secondary"
+                type="info"
+                plain
                 :disabled="!canSetSelectedPlaylistActive"
                 @click="emit('set-active-playlist', selectedPlaylist.id)"
-              />
-              <Button
-                icon="pi pi-arrow-up"
+              >
+                再生対象にする
+              </ElButton>
+              <ElButton
+                :icon="ArrowUp"
                 size="small"
                 text
-                severity="secondary"
+                type="info"
                 aria-label="プレイリストを上へ移動"
                 :disabled="!canMoveSelectedPlaylistUp"
                 @click="emit('move-selected-playlist', -1)"
               />
-              <Button
-                icon="pi pi-arrow-down"
+              <ElButton
+                :icon="ArrowDown"
                 size="small"
                 text
-                severity="secondary"
+                type="info"
                 aria-label="プレイリストを下へ移動"
                 :disabled="!canMoveSelectedPlaylistDown"
                 @click="emit('move-selected-playlist', 1)"
@@ -120,13 +117,13 @@
                   >プレイリスト名</label
                 >
                 <div class="playlist-setting-control">
-                  <InputText
+                  <ElInput
                     :id="playlistNameInputId"
-                    :modelValue="playlistNameDraft"
+                    :model-value="playlistNameDraft"
                     size="small"
                     class="w-full"
                     @focus="focusDraftInput('playlistName')"
-                    @update:modelValue="updatePlaylistNameDraft"
+                    @update:model-value="updatePlaylistNameDraft"
                     @blur="commitPlaylistNameDraft"
                   />
                 </div>
@@ -142,13 +139,13 @@
                 <div
                   class="playlist-setting-control playlist-setting-control-toggle"
                 >
-                  <ToggleSwitch
-                    :inputId="perDisplayInputId"
-                    :modelValue="selectedPlaylist.perDisplay"
-                    @change="
+                  <ElSwitch
+                    :id="perDisplayInputId"
+                    :model-value="selectedPlaylist.perDisplay"
+                    @update:model-value="
                       emit(
                         'toggle-selected-playlist-per-display',
-                        toggleSwitchChecked($event)
+                        $event === true
                       )
                     "
                   />
@@ -162,12 +159,12 @@
                 <div
                   class="playlist-setting-control playlist-setting-control-toggle"
                 >
-                  <ToggleSwitch
-                    :inputId="playlistLoopInputId"
-                    :modelValue="selectedPlaylist.loop"
-                    @change="
+                  <ElSwitch
+                    :id="playlistLoopInputId"
+                    :model-value="selectedPlaylist.loop"
+                    @update:model-value="
                       emit('update-selected-playlist-settings', {
-                        loop: toggleSwitchChecked($event)
+                        loop: $event === true
                       })
                     "
                   />
@@ -183,12 +180,12 @@
                 <div
                   class="playlist-setting-control playlist-setting-control-toggle"
                 >
-                  <ToggleSwitch
-                    :inputId="playlistShuffleInputId"
-                    :modelValue="selectedPlaylist.shuffle"
-                    @change="
+                  <ElSwitch
+                    :id="playlistShuffleInputId"
+                    :model-value="selectedPlaylist.shuffle"
+                    @update:model-value="
                       emit('update-selected-playlist-settings', {
-                        shuffle: toggleSwitchChecked($event)
+                        shuffle: $event === true
                       })
                     "
                   />
@@ -202,14 +199,15 @@
                   >表示時間（秒）</label
                 >
                 <div class="playlist-setting-control">
-                  <InputNumber
-                    :inputId="playlistDefaultDurationInputId"
-                    :modelValue="playlistDefaultDurationDraft"
+                  <ElInputNumber
+                    :id="playlistDefaultDurationInputId"
+                    :model-value="playlistDefaultDurationDraft"
                     size="small"
+                    class="w-full"
                     :min="PLAYLIST_DURATION_MIN"
                     :max="PLAYLIST_DURATION_MAX"
                     @focus="focusDraftInput('defaultDuration')"
-                    @update:modelValue="updatePlaylistDefaultDurationDraft"
+                    @update:model-value="updatePlaylistDefaultDurationDraft"
                     @blur="commitPlaylistDefaultDurationDraft"
                   />
                 </div>
@@ -222,14 +220,15 @@
                   >読込待機時間（秒）</label
                 >
                 <div class="playlist-setting-control">
-                  <InputNumber
-                    :inputId="playlistWebTimeoutInputId"
-                    :modelValue="playlistWebTimeoutDraft"
+                  <ElInputNumber
+                    :id="playlistWebTimeoutInputId"
+                    :model-value="playlistWebTimeoutDraft"
                     size="small"
+                    class="w-full"
                     :min="PLAYLIST_WEB_TIMEOUT_MIN"
                     :max="PLAYLIST_WEB_TIMEOUT_MAX"
                     @focus="focusDraftInput('webTimeout')"
-                    @update:modelValue="updatePlaylistWebTimeoutDraft"
+                    @update:model-value="updatePlaylistWebTimeoutDraft"
                     @blur="commitPlaylistWebTimeoutDraft"
                   />
                 </div>
@@ -237,100 +236,88 @@
             </div>
 
             <div v-if="selectedPlaylist.perDisplay" class="playlist-tab-shell">
-              <Tabs
-                :value="selectedPlaylistScope"
-                @update:value="emit('update-selected-playlist-scope', $event)"
+              <ElTabs
+                class="playlist-tabs"
+                :model-value="selectedPlaylistScope"
+                @update:model-value="
+                  emit('update-selected-playlist-scope', $event)
+                "
               >
-                <TabList>
-                  <Tab value="shared">{{ primaryDisplayTabLabel }}</Tab>
-                  <Tab
-                    v-for="display in secondaryDisplays"
-                    :key="display.id"
-                    :value="display.id"
+                <ElTabPane :label="primaryDisplayTabLabel" name="shared">
+                  <div class="playlist-editor-shell">
+                    <PlaylistEditor
+                      :playlist="selectedPlaylist.items"
+                      :default-duration-sec="
+                        selectedPlaylist.defaultDurationSec
+                      "
+                      @update:playlist="
+                        emit('update-selected-shared-playlist', $event)
+                      "
+                    />
+                  </div>
+                </ElTabPane>
+
+                <ElTabPane
+                  v-for="display in secondaryDisplays"
+                  :key="display.id"
+                  :label="display.label"
+                  :name="display.id"
+                >
+                  <div
+                    class="playlist-editor-shell"
+                    :data-testid="`display-card-${display.id}`"
                   >
-                    {{ display.label }}
-                  </Tab>
-                </TabList>
-
-                <TabPanels>
-                  <TabPanel value="shared">
-                    <div class="playlist-editor-shell">
-                      <PlaylistEditor
-                        :playlist="selectedPlaylist.items"
-                        :default-duration-sec="
-                          selectedPlaylist.defaultDurationSec
-                        "
-                        @update:playlist="
-                          emit('update-selected-shared-playlist', $event)
-                        "
-                      />
-                    </div>
-                  </TabPanel>
-
-                  <TabPanel
-                    v-for="display in secondaryDisplays"
-                    :key="display.id"
-                    :value="display.id"
-                  >
-                    <div
-                      class="playlist-editor-shell"
-                      :data-testid="`display-card-${display.id}`"
-                    >
-                      <div class="field-inline display-editor-header">
-                        <div class="field-copy">
-                          <strong>{{ display.label }}</strong>
-                          <p class="surface-note">
-                            {{ display.bounds.width }} x
-                            {{ display.bounds.height }}
-                          </p>
-                        </div>
-
-                        <div class="display-summary-actions">
-                          <Tag
-                            :value="display.isPrimary ? 'メイン' : '画面'"
-                            severity="secondary"
-                          />
-                          <div class="field-inline field-inline-compact">
-                            <label
-                              :for="displayPlaylistEnabledInputId(display.id)"
-                              >再生対象</label
-                            >
-                            <ToggleSwitch
-                              :inputId="
-                                displayPlaylistEnabledInputId(display.id)
-                              "
-                              :modelValue="
-                                isDisplayEnabledForPlaylist(display.id)
-                              "
-                              @change="
-                                emit(
-                                  'set-display-playlist-enabled',
-                                  display.id,
-                                  toggleSwitchChecked($event)
-                                )
-                              "
-                            />
-                          </div>
-                        </div>
+                    <div class="field-inline display-editor-header">
+                      <div class="field-copy">
+                        <strong>{{ display.label }}</strong>
+                        <p class="surface-note">
+                          {{ display.bounds.width }} x
+                          {{ display.bounds.height }}
+                        </p>
                       </div>
 
-                      <PlaylistEditor
-                        :playlist="displayPlaylist(display.id).items"
-                        :default-duration-sec="
-                          displayPlaylist(display.id).defaultDurationSec
-                        "
-                        @update:playlist="
-                          emit(
-                            'update-selected-display-playlist',
-                            display.id,
-                            $event
-                          )
-                        "
-                      />
+                      <div class="display-summary-actions">
+                        <ElTag type="info">
+                          {{ display.isPrimary ? 'メイン' : '画面' }}
+                        </ElTag>
+                        <div class="field-inline field-inline-compact">
+                          <label
+                            :for="displayPlaylistEnabledInputId(display.id)"
+                            >再生対象</label
+                          >
+                          <ElSwitch
+                            :id="displayPlaylistEnabledInputId(display.id)"
+                            :model-value="
+                              isDisplayEnabledForPlaylist(display.id)
+                            "
+                            @update:model-value="
+                              emit(
+                                'set-display-playlist-enabled',
+                                display.id,
+                                $event === true
+                              )
+                            "
+                          />
+                        </div>
+                      </div>
                     </div>
-                  </TabPanel>
-                </TabPanels>
-              </Tabs>
+
+                    <PlaylistEditor
+                      :playlist="displayPlaylist(display.id).items"
+                      :default-duration-sec="
+                        displayPlaylist(display.id).defaultDurationSec
+                      "
+                      @update:playlist="
+                        emit(
+                          'update-selected-display-playlist',
+                          display.id,
+                          $event
+                        )
+                      "
+                    />
+                  </div>
+                </ElTabPane>
+              </ElTabs>
             </div>
 
             <div v-else class="playlist-editor-shell">
@@ -350,6 +337,14 @@
 </template>
 
 <script setup lang="ts">
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  CopyDocument,
+  Delete,
+  Plus
+} from '@element-plus/icons-vue'
 import { computed, ref, watch } from 'vue'
 import PlaylistEditor from '../PlaylistEditor.vue'
 import {
@@ -603,10 +598,6 @@ const isDisplayEnabledForPlaylist = (displayId: string) =>
     props.selectedPlaylist.id
   ] !== false
 
-/** Reads the checked state from a PrimeVue toggle change event. */
-const toggleSwitchChecked = (event: Event): boolean =>
-  Boolean((event.target as HTMLInputElement | null)?.checked)
-
 /** Returns the playlist shown for a specific display tab. */
 const displayPlaylist = (displayId: string) =>
   getPlaylistById(
@@ -677,12 +668,6 @@ const displayPlaylist = (displayId: string) =>
     width: 100%;
     max-width: 360px;
     justify-self: stretch;
-
-    :where(.p-inputnumber, .p-select, .p-inputtext),
-    .p-inputnumber-input,
-    .p-select-label {
-      width: 100%;
-    }
   }
 
   .playlist-setting-control-toggle {
@@ -708,17 +693,17 @@ const displayPlaylist = (displayId: string) =>
     > :not(.field-copy) {
       flex: 0 0 auto;
     }
+  }
 
-    &-compact {
-      gap: 8px;
-      padding: 7px 10px;
-      border-radius: 999px;
-      background: var(--panel-soft-strong);
-    }
+  .field-inline-compact {
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: var(--panel-soft-strong);
+  }
 
-    &-toggle {
-      align-items: flex-start;
-    }
+  .field-inline-toggle {
+    align-items: flex-start;
   }
 
   .field-copy {
@@ -787,6 +772,10 @@ const displayPlaylist = (displayId: string) =>
     justify-content: flex-end;
   }
 
+  :where(.playlist-pane-actions, .playlist-detail-actions) > .el-button {
+    margin-left: 0;
+  }
+
   .playlist-catalog {
     display: grid;
     gap: 8px;
@@ -819,7 +808,11 @@ const displayPlaylist = (displayId: string) =>
 
     &.is-selected {
       border-color: color-mix(in srgb, var(--accent), transparent 28%);
-      background: color-mix(in srgb, var(--accent-soft), white 56%);
+      background: color-mix(
+        in srgb,
+        var(--accent-soft),
+        var(--surface-strong) 56%
+      );
       box-shadow: inset 0 0 0 1px
         color-mix(in srgb, var(--accent), transparent 78%);
     }
@@ -875,34 +868,47 @@ const displayPlaylist = (displayId: string) =>
   }
 
   .playlist-tab-shell {
-    :where(.p-tabs) {
+    .playlist-tabs {
+      --el-tabs-header-height: 40px;
+
       display: flex;
       flex-direction: column;
       min-height: 100%;
     }
 
-    :where(.p-tablist) {
-      gap: 6px;
-      border-bottom: 1px solid var(--line-subtle);
+    .playlist-tabs > :where(.el-tabs__header) {
+      flex: 0 0 auto;
+      margin: 0;
+      --el-color-primary: var(--accent);
     }
 
-    :where(.p-tab) {
+    .playlist-tabs :where(.el-tabs__nav-wrap)::after {
+      height: 1px;
+      background-color: var(--line-subtle);
+    }
+
+    .playlist-tabs :where(.el-tabs__nav) {
+      gap: 6px;
+    }
+
+    .playlist-tabs :where(.el-tabs__item) {
       padding-inline: 14px;
       color: var(--muted);
       border-radius: 999px 999px 0 0;
     }
 
-    :where(.p-tab-active) {
+    .playlist-tabs :where(.el-tabs__item.is-active) {
       color: var(--ink);
     }
 
-    :where(.p-tabpanels) {
+    .playlist-tabs > :where(.el-tabs__content) {
       flex: 1;
+      min-height: 0;
       overflow: auto;
       padding: 0;
     }
 
-    :where(.p-tabpanel) {
+    .playlist-tabs :where(.el-tab-pane) {
       padding: 0;
     }
   }

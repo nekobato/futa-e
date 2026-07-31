@@ -13,23 +13,26 @@
         <h1 class="control-pagebar-title">Futa E</h1>
       </div>
       <div class="control-pagebar-actions">
-        <Button
+        <ElButton
           class="control-pagebar-button"
-          label="開始"
-          icon="pi pi-play"
+          :icon="VideoPlay"
           size="small"
-          severity="contrast"
+          type="primary"
           :disabled="!isConfigReady"
           @click="handleStartPlayer"
-        />
-        <Button
+        >
+          開始
+        </ElButton>
+        <ElButton
           class="control-pagebar-button"
-          label="使い方"
-          icon="pi pi-question-circle"
+          :icon="QuestionFilled"
           size="small"
-          severity="secondary"
+          type="info"
+          plain
           @click="showTutorial"
-        />
+        >
+          使い方
+        </ElButton>
       </div>
     </header>
 
@@ -43,13 +46,15 @@
             <p class="surface-kicker">Guide</p>
             <h2 id="usage-title">使い方</h2>
           </div>
-          <Button
-            label="設定へ戻る"
-            icon="pi pi-arrow-left"
+          <ElButton
+            :icon="ArrowLeft"
             size="small"
-            severity="secondary"
+            type="info"
+            plain
             @click="hideTutorial"
-          />
+          >
+            設定へ戻る
+          </ElButton>
         </div>
 
         <ol class="tutorial-steps">
@@ -126,11 +131,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useToast } from 'primevue/usetoast'
+import { ArrowLeft, QuestionFilled, VideoPlay } from '@element-plus/icons-vue'
 import DisplaySettingsPanel from '../components/control/DisplaySettingsPanel.vue'
 import PlaylistWorkbenchSection from '../components/control/PlaylistWorkbenchSection.vue'
 import StartupSettingsPanel from '../components/control/StartupSettingsPanel.vue'
 import { useControlView } from '../composables/useControlView'
+import { notifications } from '../shared/notifications'
 
 const {
   addPlaylist,
@@ -163,7 +169,6 @@ const {
   updateSelectedSharedPlaylist
 } = useControlView()
 
-const toast = useToast()
 const isTutorialVisible = ref(false)
 
 /** Shows the lightweight usage tutorial in place of the settings screen. */
@@ -179,11 +184,8 @@ const hideTutorial = () => {
 /** Prevents player launch when every display has been disabled in settings. */
 const handleStartPlayer = async () => {
   if (enabledDisplayCount.value === 0) {
-    toast.add({
-      severity: 'warn',
-      summary: '開始できません',
-      detail: '少なくとも一つのDisplayを有効にしてください',
-      life: 3000
+    notifications.warning('少なくとも一つのDisplayを有効にしてください', {
+      title: '開始できません'
     })
     return
   }
@@ -342,7 +344,7 @@ const handleStartPlayer = async () => {
     display: grid;
     place-items: center;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--surface-strong), white 42%);
+    background: color-mix(in srgb, var(--surface-strong), var(--paper-2) 42%);
     border: 1px solid var(--line-subtle);
     font-family: var(--font-display);
     font-size: 13px;
