@@ -69,7 +69,8 @@ import { getFutaeApi } from '../shared/api'
 import { createDefaultConfig } from '../shared/defaults'
 import {
   getActivePlaylist,
-  getEffectiveDisplayConfig
+  getEffectiveDisplayConfig,
+  isDisplayPlaybackTarget
 } from '../shared/player-config'
 import {
   createPlaybackOrder,
@@ -130,7 +131,10 @@ const missingDisplayTarget = computed(
       !detectedDisplays.value.some((display) => display.id === displayId))
 )
 const displayEnabled = computed(
-  () => !missingDisplayTarget.value && effectiveDisplay.value.enabled
+  () =>
+    !missingDisplayTarget.value &&
+    Boolean(displayId) &&
+    isDisplayPlaybackTarget(config.value, displayId ?? '')
 )
 const activePlaylist = computed(() => effectiveActivePlaylistConfig.value.items)
 const currentItem = computed(

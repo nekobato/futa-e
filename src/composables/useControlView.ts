@@ -6,6 +6,8 @@ import {
   createDefaultPlaylistConfig
 } from '../shared/defaults'
 import {
+  countPlaybackDisplays,
+  createDisplayConfig,
   ensureDisplayConfigs,
   getPlaylistById,
   getPrimaryDisplayId,
@@ -60,11 +62,8 @@ export const useControlView = () => {
       (playlist) => playlist.id === selectedPlaylist.value.id
     )
   )
-  const enabledDisplayCount = computed(
-    () =>
-      displayInfos.value.filter(
-        (display) => config.value.displays[display.id]?.enabled !== false
-      ).length
+  const enabledDisplayCount = computed(() =>
+    countPlaybackDisplays(config.value, displayInfos.value)
   )
   const primaryDisplayId = computed(() =>
     getPrimaryDisplayId(displayInfos.value)
@@ -72,12 +71,7 @@ export const useControlView = () => {
 
   /** Returns the effective display configuration for a display id. */
   const getDisplayConfig = (displayId: string): DisplayConfig =>
-    config.value.displays[displayId] ?? {
-      enabled: false,
-      playlists: config.value.playlists.map((playlist) =>
-        clonePlaylist(playlist)
-      )
-    }
+    config.value.displays[displayId] ?? createDisplayConfig(config.value, false)
 
   /** Clones playlist items so cross-display updates do not share references. */
   const cloneItems = (items: PlaylistItem[]): PlaylistItem[] =>
@@ -291,6 +285,31 @@ export const useControlView = () => {
           [displayId]: {
             ...displayConfig,
             enabled
+          }
+        }
+      },
+      { syncCurrentSelection: false, touchAutoSave: true }
+    )
+  }
+
+  /** Toggles whether the selected playlist includes a display in playback. */
+  const setSelectedDisplayPlaylistEnabled = (
+    displayId: string,
+    enabled: boolean
+  ) => {
+    const displayConfig = getDisplayConfig(displayId)
+
+    updateConfigState(
+      {
+        ...config.value,
+        displays: {
+          ...config.value.displays,
+          [displayId]: {
+            ...displayConfig,
+            playlistEnabled: {
+              ...displayConfig.playlistEnabled,
+              [selectedPlaylist.value.id]: enabled
+            }
           }
         }
       },
@@ -550,6 +569,11 @@ export const useControlView = () => {
             displayId,
             {
               ...displayConfig,
+              playlistEnabled: {
+                ...displayConfig.playlistEnabled,
+                [duplicateId]:
+                  displayConfig.playlistEnabled[source.id] !== false
+              },
               playlists: nextDisplayPlaylists
             }
           ]
@@ -681,6 +705,7 @@ export const useControlView = () => {
     setActivePlaylist,
     setDisplayEnabled,
     setLaunchAtLogin,
+    setSelectedDisplayPlaylistEnabled,
     startPlayer,
     toggleSelectedPlaylistPerDisplay,
     updateSelectedDisplayPlaylist,

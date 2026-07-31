@@ -8,6 +8,8 @@
 
 Kiosk 起動中に Display を取り外すと対応する Kiosk windowを閉じ、再接続した有効なDisplayにはKiosk windowを再作成します。Display構成や表示領域が変わった場合は、残りのKiosk windowも現在の配置へ追従します。
 
+この設定はすべての Playlist に優先します。Display を無効にすると、Playlist 側で再生対象になっていても、その Display では再生しません。
+
 ## 2. Playlist を管理する
 
 `Playlists` の一覧には、保存済みの Playlist が表示されます。
@@ -71,9 +73,11 @@ URL で追加した画像・動画・Web は、アプリ独自にはダウンロ
 「モニターを分ける」をオンにすると、Playlist 項目の編集欄が Display ごとのタブへ分かれます。
 
 - メイン Display 名のタブ: メイン Display で使う項目
-- その他の Display 名のタブ: その Display だけで使う項目
+- その他の Display 名のタブ: その Display だけで使う項目と、選択中の Playlist で再生対象にするかどうか
 
-個別化できるのは Playlist の項目リストです。ループ、シャッフル、既定表示時間、Web 読込待機時間は Playlist 全体で共通です。
+Display ごとに変更できるのは Playlist の項目リストと再生対象設定です。ループ、シャッフル、既定表示時間、Web 読込待機時間は Playlist 全体で共通です。
+
+Display タブの「再生対象」をオフにすると、選択中の Playlist をその Display では再生しません。この設定は Playlist ごとに保存されます。`Displays` で無効になっている Display は、こちらがオンでも再生対象にはなりません。
 
 ## 6. OSログイン時にアプリを起動する
 

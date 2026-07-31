@@ -292,15 +292,19 @@
                           />
                           <div class="field-inline field-inline-compact">
                             <label
-                              :for="displayEditorEnabledInputId(display.id)"
-                              >有効</label
+                              :for="displayPlaylistEnabledInputId(display.id)"
+                              >再生対象</label
                             >
                             <ToggleSwitch
-                              :inputId="displayEditorEnabledInputId(display.id)"
-                              :modelValue="isDisplayEnabled(display.id)"
+                              :inputId="
+                                displayPlaylistEnabledInputId(display.id)
+                              "
+                              :modelValue="
+                                isDisplayEnabledForPlaylist(display.id)
+                              "
                               @change="
                                 emit(
-                                  'set-display-enabled',
+                                  'set-display-playlist-enabled',
                                   display.id,
                                   toggleSwitchChecked($event)
                                 )
@@ -385,7 +389,7 @@ const emit = defineEmits<{
   'rename-selected-playlist': [name: string]
   'select-playlist': [playlistId: string]
   'set-active-playlist': [playlistId: string]
-  'set-display-enabled': [displayId: string, enabled: boolean]
+  'set-display-playlist-enabled': [displayId: string, enabled: boolean]
   'toggle-selected-playlist-per-display': [enabled: boolean]
   'update-selected-display-playlist': [
     displayId: string,
@@ -589,13 +593,15 @@ const commitPlaylistWebTimeoutDraft = () => {
   }
 }
 
-/** Builds a stable input id for display-specific editor toggles. */
-const displayEditorEnabledInputId = (displayId: string) =>
-  `display-editor-enabled-${displayId}`
+/** Builds a stable input id for per-playlist display inclusion toggles. */
+const displayPlaylistEnabledInputId = (displayId: string) =>
+  `display-playlist-enabled-${displayId}`
 
-/** Resolves the current enabled state for a display override. */
-const isDisplayEnabled = (displayId: string) =>
-  props.config.displays[displayId]?.enabled ?? true
+/** Resolves whether the selected playlist includes a display in playback. */
+const isDisplayEnabledForPlaylist = (displayId: string) =>
+  props.config.displays[displayId]?.playlistEnabled?.[
+    props.selectedPlaylist.id
+  ] !== false
 
 /** Reads the checked state from a PrimeVue toggle change event. */
 const toggleSwitchChecked = (event: Event): boolean =>

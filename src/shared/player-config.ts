@@ -46,11 +46,26 @@ export const syncPlaylistsWithSource = (
   })
 }
 
+/**
+ * Synchronizes per-playlist display inclusion with the shared playlist catalog.
+ */
+export const syncPlaylistEnabledWithSource = (
+  sourcePlaylists: PlaylistConfig[] | undefined,
+  current: Record<string, boolean> | undefined
+): Record<string, boolean> =>
+  Object.fromEntries(
+    ensurePlaylists(sourcePlaylists).map((playlist) => [
+      playlist.id,
+      current?.[playlist.id] !== false
+    ])
+  )
+
 export const createDisplayConfig = (
   config: PlayerConfig,
   enabled = true
 ): DisplayConfig => ({
   enabled,
+  playlistEnabled: syncPlaylistEnabledWithSource(config.playlists, undefined),
   playlists: ensurePlaylists(config.playlists)
 })
 
@@ -70,6 +85,10 @@ export const ensureDisplayConfigs = (
     nextDisplays[display.id] = current
       ? {
           enabled: current.enabled,
+          playlistEnabled: syncPlaylistEnabledWithSource(
+            config.playlists,
+            current.playlistEnabled
+          ),
           playlists: syncPlaylistsWithSource(
             config.playlists,
             current.playlists
@@ -124,11 +143,7 @@ export const getEffectiveDisplayConfig = (
   config: PlayerConfig,
   displayId: string | null
 ): DisplayConfig => {
-  if (!displayId || !isPerDisplayPlaylist(getActivePlaylist(config))) {
-    return createDisplayConfig(config)
-  }
-
-  const current = config.displays[displayId]
+  const current = displayId ? config.displays[displayId] : undefined
 
   if (!current) {
     return createDisplayConfig(config)
@@ -136,8 +151,37 @@ export const getEffectiveDisplayConfig = (
 
   return {
     enabled: current.enabled,
-    playlists: syncPlaylistsWithSource(config.playlists, current.playlists)
+    playlistEnabled: syncPlaylistEnabledWithSource(
+      config.playlists,
+      current.playlistEnabled
+    ),
+    playlists: isPerDisplayPlaylist(getActivePlaylist(config))
+      ? syncPlaylistsWithSource(config.playlists, current.playlists)
+      : ensurePlaylists(config.playlists)
   }
+}
+
+/**
+ * Returns whether a display is included by both global and active-playlist
+ * playback settings.
+ */
+export const isDisplayPlaybackTarget = (
+  config: PlayerConfig,
+  displayId: string
+): boolean => {
+  const displayConfig = config.displays[displayId]
+
+  if (displayConfig?.enabled === false) {
+    return false
+  }
+
+  const activePlaylist = getActivePlaylist(config)
+
+  if (!activePlaylist.perDisplay) {
+    return true
+  }
+
+  return displayConfig?.playlistEnabled?.[activePlaylist.id] !== false
 }
 
 export const replacePlaylistById = (
@@ -195,17 +239,17 @@ export const replacePlaylistSettingsById = (
   }))
 
 /**
- * Filters the provided displays down to playback targets that remain enabled.
+ * Filters displays down to targets enabled globally and by the active playlist.
  */
-export const filterEnabledDisplays = <T extends { id: string | number }>(
+export const filterPlaybackDisplays = <T extends { id: string | number }>(
   config: PlayerConfig,
   displays: T[]
 ): T[] =>
-  displays.filter(
-    (display) => config.displays[String(display.id)]?.enabled !== false
+  displays.filter((display) =>
+    isDisplayPlaybackTarget(config, String(display.id))
   )
 
-export const countEnabledDisplays = (
+export const countPlaybackDisplays = (
   config: PlayerConfig,
   displays: DisplayInfo[]
-): number => filterEnabledDisplays(config, displays).length
+): number => filterPlaybackDisplays(config, displays).length

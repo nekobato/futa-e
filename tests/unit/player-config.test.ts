@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultConfig } from '../../src/shared/defaults'
 import {
-  countEnabledDisplays,
+  countPlaybackDisplays,
   ensureDisplayConfigs,
   getActivePlaylist,
   getEffectiveDisplayConfig,
   getPrimaryDisplayId,
-  getPlaylistById
+  getPlaylistById,
+  isDisplayPlaybackTarget
 } from '../../src/shared/player-config'
 import type { DisplayInfo } from '../../src/shared/types'
 
@@ -61,6 +62,10 @@ describe('player-config helpers', () => {
 
     expect(Object.keys(next.displays)).toEqual(['1', '2'])
     expect(next.displays['1'].enabled).toBe(true)
+    expect(next.displays['1'].playlistEnabled).toEqual({
+      shared: true,
+      secondary: true
+    })
     expect(next.displays['1'].playlists).toHaveLength(2)
     expect(
       getPlaylistById(next.displays['1'].playlists, 'shared').items
@@ -161,9 +166,11 @@ describe('player-config helpers', () => {
     ]
     config.activePlaylistId = 'playlist-2'
     config.displays = ensureDisplayConfigs(config, displays).displays
+    config.displays['2'].enabled = false
 
     const effective = getEffectiveDisplayConfig(config, '2')
 
+    expect(effective.enabled).toBe(false)
     expect(
       getPlaylistById(effective.playlists, 'playlist-2').items[0]?.id
     ).toBe('shared-2')
@@ -172,7 +179,7 @@ describe('player-config helpers', () => {
     )
   })
 
-  it('counts enabled per-display windows only when the active playlist is per-display', () => {
+  it('excludes a display disabled globally from a per-display playlist', () => {
     const config = ensureDisplayConfigs(createDefaultConfig(), displays)
     config.playlists = [
       {
@@ -200,10 +207,34 @@ describe('player-config helpers', () => {
     config.displays = ensureDisplayConfigs(config, displays).displays
     config.displays['2'].enabled = false
 
-    expect(countEnabledDisplays(config, displays)).toBe(1)
+    expect(isDisplayPlaybackTarget(config, '2')).toBe(false)
+    expect(countPlaybackDisplays(config, displays)).toBe(1)
   })
 
-  it('counts only enabled displays even when the active playlist is shared', () => {
+  it('excludes a display disabled by the active per-display playlist', () => {
+    const config = ensureDisplayConfigs(createDefaultConfig(), displays)
+    const playlistId = config.activePlaylistId
+    config.playlists[0]!.perDisplay = true
+    config.displays = ensureDisplayConfigs(config, displays).displays
+    config.displays['2'].playlistEnabled[playlistId] = false
+
+    expect(config.displays['2'].enabled).toBe(true)
+    expect(isDisplayPlaybackTarget(config, '2')).toBe(false)
+    expect(countPlaybackDisplays(config, displays)).toBe(1)
+  })
+
+  it('requires both global and active-playlist settings to include a display', () => {
+    const config = ensureDisplayConfigs(createDefaultConfig(), displays)
+    const playlistId = config.activePlaylistId
+    config.playlists[0]!.perDisplay = true
+    config.displays = ensureDisplayConfigs(config, displays).displays
+    config.displays['2'].enabled = false
+    config.displays['2'].playlistEnabled[playlistId] = true
+
+    expect(isDisplayPlaybackTarget(config, '2')).toBe(false)
+  })
+
+  it('uses only the global display setting for a shared playlist', () => {
     const config = ensureDisplayConfigs(createDefaultConfig(), displays)
     config.playlists = [
       {
@@ -219,8 +250,9 @@ describe('player-config helpers', () => {
     ]
     config.activePlaylistId = 'playlist-1'
     config.displays = ensureDisplayConfigs(config, displays).displays
-    config.displays['2'].enabled = false
+    config.displays['2'].playlistEnabled['playlist-1'] = false
 
-    expect(countEnabledDisplays(config, displays)).toBe(1)
+    expect(isDisplayPlaybackTarget(config, '2')).toBe(true)
+    expect(countPlaybackDisplays(config, displays)).toBe(2)
   })
 })

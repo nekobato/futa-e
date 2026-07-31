@@ -81,6 +81,9 @@ playlist item は少なくとも次の情報を持つ。
 - 再生対象 playlist の ToggleSwitch が ON の場合は、現在存在するモニター一覧を取得し、各モニターごとに設定項目を表示する
 - モニターごとの識別子には `Electron.Display.id` を使う
 - 個別設定が存在しないモニターは共通設定へフォールバックする
+- モニター全体の `enabled` と、playlist ごとのモニター再生対象設定を別々に持つ
+- モニター全体の `enabled = false` は playlist ごとの設定より優先し、常に再生対象外とする
+- `perDisplay = true` の playlist では、モニター全体と当該 playlist の設定が両方有効なモニターだけを再生対象とする
 - Kiosk起動中にモニターを取り外した場合は、対応するplayer windowを閉じる
 - 有効な登録済みモニターを再接続した場合は、対応するplayer windowを再作成する
 - モニターの追加・取り外し・表示領域変更時は、既存player windowを現在のboundsへ再配置する
@@ -131,6 +134,7 @@ type PlayerConfig = {
 
 type DisplayConfig = {
   enabled: boolean
+  playlistEnabled: Record<string, boolean>
   playlists: PlaylistConfig[]
 }
 ```

@@ -48,10 +48,16 @@ describe('Player window reconciliation', () => {
     const config = createDefaultConfig()
     config.displays['3'] = {
       enabled: true,
+      playlistEnabled: {
+        [config.activePlaylistId]: true
+      },
       playlists: config.playlists
     }
     config.displays['4'] = {
       enabled: false,
+      playlistEnabled: {
+        [config.activePlaylistId]: true
+      },
       playlists: config.playlists
     }
     const displays = ['1', '2', '3', '4'].map((id) => ({ id }))

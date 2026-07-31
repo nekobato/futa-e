@@ -63,5 +63,6 @@ export type DisplayInfo = {
 
 export type DisplayConfig = {
   enabled: boolean
+  playlistEnabled: Record<string, boolean>
   playlists: PlaylistConfig[]
 }

@@ -281,8 +281,23 @@ const normalizeDisplayConfig = (
         })
       )
 
+  const savedPlaylistEnabled = isRecord(value.playlistEnabled)
+    ? value.playlistEnabled
+    : {}
+  const playlistEnabled = Object.fromEntries(
+    playlists.map((playlist): [string, boolean] => {
+      const savedEnabled = savedPlaylistEnabled[playlist.id]
+
+      return [
+        playlist.id,
+        typeof savedEnabled === 'boolean' ? savedEnabled : true
+      ]
+    })
+  )
+
   return {
     enabled: typeof value.enabled === 'boolean' ? value.enabled : true,
+    playlistEnabled,
     playlists
   }
 }

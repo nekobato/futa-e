@@ -21,6 +21,7 @@ import type {
   PlayerStatus
 } from '../src/shared/types'
 import { coerceConfig, createDefaultConfig } from '../src/shared/defaults'
+import { filterPlaybackDisplays } from '../src/shared/player-config'
 import { dialogExtensionsForKind } from '../src/shared/picked-assets'
 import {
   getConfigDiagnostics,
@@ -462,10 +463,13 @@ const reconcilePlayerWindows = async (
     return
   }
 
-  const displays = selectPlayerTargetDisplays(
+  const displays = filterPlaybackDisplays(
     playbackConfig,
-    screen.getAllDisplays(),
-    playerModeInitialDisplayIds
+    selectPlayerTargetDisplays(
+      playbackConfig,
+      screen.getAllDisplays(),
+      playerModeInitialDisplayIds
+    )
   )
   const displaysById = new Map(
     displays.map((display) => [String(display.id), display])

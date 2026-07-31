@@ -45,6 +45,73 @@ describe('config coercion', () => {
     expect(config.activePlaylistId).toBe('playlist-2')
   })
 
+  it('defaults missing per-playlist display settings to enabled', () => {
+    const config = coerceConfig({
+      version: 1,
+      activePlaylistId: 'playlist-1',
+      playlists: [
+        {
+          id: 'playlist-1',
+          name: 'プレイリスト 1',
+          perDisplay: true,
+          loop: true,
+          shuffle: false,
+          defaultDurationSec: 10,
+          webTimeoutSec: 8,
+          items: []
+        }
+      ],
+      displays: {
+        display1: {
+          enabled: false,
+          playlists: []
+        }
+      },
+      updatedAt: '2026-03-18T00:00:00.000Z'
+    })
+
+    expect(config.displays.display1).toMatchObject({
+      enabled: false,
+      playlistEnabled: {
+        'playlist-1': true
+      }
+    })
+  })
+
+  it('preserves saved per-playlist display settings', () => {
+    const config = coerceConfig({
+      version: 1,
+      activePlaylistId: 'playlist-1',
+      playlists: [
+        {
+          id: 'playlist-1',
+          name: 'プレイリスト 1',
+          perDisplay: true,
+          loop: true,
+          shuffle: false,
+          defaultDurationSec: 10,
+          webTimeoutSec: 8,
+          items: []
+        }
+      ],
+      displays: {
+        display1: {
+          enabled: true,
+          playlistEnabled: {
+            'playlist-1': false,
+            removed: false
+          },
+          playlists: []
+        }
+      },
+      updatedAt: '2026-03-18T00:00:00.000Z'
+    })
+
+    expect(config.displays.display1.playlistEnabled).toEqual({
+      'playlist-1': false
+    })
+  })
+
   it('normalizes playlist item playback modes', () => {
     const config = coerceConfig({
       version: 1,

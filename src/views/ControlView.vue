@@ -105,7 +105,7 @@
         @rename-selected-playlist="renameSelectedPlaylist"
         @select-playlist="selectPlaylist"
         @set-active-playlist="setActivePlaylist"
-        @set-display-enabled="setDisplayEnabled"
+        @set-display-playlist-enabled="setSelectedDisplayPlaylistEnabled"
         @toggle-selected-playlist-per-display="toggleSelectedPlaylistPerDisplay"
         @update-selected-display-playlist="updateSelectedDisplayPlaylist"
         @update-selected-playlist-default-duration="
@@ -152,6 +152,7 @@ const {
   setActivePlaylist,
   setDisplayEnabled,
   setLaunchAtLogin,
+  setSelectedDisplayPlaylistEnabled,
   startPlayer,
   toggleSelectedPlaylistPerDisplay,
   updateSelectedDisplayPlaylist,
