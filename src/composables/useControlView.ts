@@ -26,6 +26,8 @@ import type {
   PlaylistItem
 } from '../shared/types'
 import type { LaunchAtLoginSettings } from '../shared/ipc'
+import type { KioskExitShortcutSettings } from '../shared/ipc'
+import { DEFAULT_KIOSK_EXIT_SHORTCUT } from '../shared/kiosk-exit-shortcut'
 import { createId } from '../shared/utils'
 
 /**
@@ -46,8 +48,13 @@ export const useControlView = () => {
   })
   const launchAtLoginPending = ref(false)
   const launchAtLoginError = ref('')
+  const kioskExitShortcutSettings = ref<KioskExitShortcutSettings>({
+    accelerator: DEFAULT_KIOSK_EXIT_SHORTCUT,
+    registered: false
+  })
+  const kioskExitShortcutPending = ref(false)
+  const kioskExitShortcutError = ref('')
   const selectedPlaylistId = ref('')
-  const selectedPlaylistScope = ref('shared')
 
   let removeDisplayListener: (() => void) | null = null
 
@@ -121,16 +128,6 @@ export const useControlView = () => {
     )
 
     selectedPlaylistId.value = nextSelected.id
-
-    if (
-      !nextSelected.perDisplay ||
-      (selectedPlaylistScope.value !== 'shared' &&
-        !displayInfos.value.some(
-          (display) => display.id === selectedPlaylistScope.value
-        ))
-    ) {
-      selectedPlaylistScope.value = 'shared'
-    }
   }
 
   /** Synchronizes connected display changes into the editable config. */
@@ -197,6 +194,18 @@ export const useControlView = () => {
     }
   }
 
+  /** Refreshes the configured system-wide Kiosk exit shortcut. */
+  const refreshKioskExitShortcut = async () => {
+    try {
+      kioskExitShortcutSettings.value = await api.system.getKioskExitShortcut()
+      kioskExitShortcutError.value = ''
+    } catch (error) {
+      console.error('Failed to read the Kiosk exit shortcut.', error)
+      kioskExitShortcutError.value =
+        'Kiosk終了ショートカットを読み込めませんでした。'
+    }
+  }
+
   /** Loads persisted config, current displays, and player state. */
   const loadConfig = async () => {
     autoSave.pause()
@@ -220,7 +229,7 @@ export const useControlView = () => {
       autoSave.touch()
     }
     status.value = nextStatus
-    await refreshLaunchAtLogin()
+    await Promise.all([refreshLaunchAtLogin(), refreshKioskExitShortcut()])
     isConfigReady.value = true
   }
 
@@ -251,15 +260,46 @@ export const useControlView = () => {
     }
   }
 
+  /** Validates, registers, and persists a system-wide Kiosk exit shortcut. */
+  const setKioskExitShortcut = async (accelerator: string) => {
+    if (kioskExitShortcutPending.value) {
+      return
+    }
+
+    kioskExitShortcutPending.value = true
+    kioskExitShortcutError.value = ''
+
+    try {
+      await autoSave.flush()
+      const settings = await api.system.setKioskExitShortcut(accelerator)
+      kioskExitShortcutSettings.value = settings
+      updateConfigState(
+        {
+          ...config.value,
+          kioskExitShortcut: settings.accelerator
+        },
+        { syncCurrentSelection: false, touchAutoSave: false }
+      )
+      autoSave.resume(config.value)
+    } catch (error) {
+      console.error('Failed to update the Kiosk exit shortcut.', error)
+      await refreshKioskExitShortcut()
+      kioskExitShortcutError.value =
+        '登録できませんでした。書式またはほかのアプリとの競合を確認してください。'
+    } finally {
+      kioskExitShortcutPending.value = false
+    }
+  }
+
   /** Refreshes externally editable OS settings when the window regains focus. */
   const handleWindowFocus = () => {
     void refreshLaunchAtLogin()
+    void refreshKioskExitShortcut()
   }
 
-  /** Selects the working playlist and resets the tab scope. */
+  /** Selects the working playlist. */
   const selectPlaylist = (playlistId: string) => {
     selectedPlaylistId.value = playlistId
-    selectedPlaylistScope.value = 'shared'
   }
 
   /** Marks a playlist as the active playback target. */
@@ -315,13 +355,6 @@ export const useControlView = () => {
       },
       { syncCurrentSelection: false, touchAutoSave: true }
     )
-  }
-
-  /** Updates the selected playlist scope tab. */
-  const updateSelectedPlaylistScope = (
-    value: string | number | null | undefined
-  ) => {
-    selectedPlaylistScope.value = value ? String(value) : 'shared'
   }
 
   /** Replaces the shared playlist items and syncs non per-display copies. */
@@ -467,7 +500,6 @@ export const useControlView = () => {
       },
       { syncCurrentSelection: true, touchAutoSave: true }
     )
-    selectedPlaylistScope.value = 'shared'
   }
 
   /** Updates selected playlist settings without replacing its items. */
@@ -531,7 +563,6 @@ export const useControlView = () => {
       { syncCurrentSelection: false, touchAutoSave: true }
     )
     selectedPlaylistId.value = playlist.id
-    selectedPlaylistScope.value = 'shared'
   }
 
   /** Duplicates the selected playlist including per-display overrides. */
@@ -590,7 +621,6 @@ export const useControlView = () => {
       { syncCurrentSelection: false, touchAutoSave: true }
     )
     selectedPlaylistId.value = duplicateId
-    selectedPlaylistScope.value = 'shared'
   }
 
   /** Removes the selected playlist while keeping one fallback playlist active. */
@@ -632,7 +662,6 @@ export const useControlView = () => {
       { syncCurrentSelection: false, touchAutoSave: true }
     )
     selectedPlaylistId.value = fallbackPlaylist.id
-    selectedPlaylistScope.value = 'shared'
   }
 
   /** Moves the selected playlist within the shared catalog order. */
@@ -692,6 +721,9 @@ export const useControlView = () => {
     displayInfos,
     duplicateSelectedPlaylist,
     isConfigReady,
+    kioskExitShortcutError,
+    kioskExitShortcutPending,
+    kioskExitShortcutSettings,
     launchAtLoginError,
     launchAtLoginPending,
     launchAtLoginSettings,
@@ -701,16 +733,15 @@ export const useControlView = () => {
     selectPlaylist,
     selectedPlaylist,
     selectedPlaylistIndex,
-    selectedPlaylistScope,
     setActivePlaylist,
     setDisplayEnabled,
     setLaunchAtLogin,
+    setKioskExitShortcut,
     setSelectedDisplayPlaylistEnabled,
     startPlayer,
     toggleSelectedPlaylistPerDisplay,
     updateSelectedDisplayPlaylist,
     updateSelectedPlaylistDefaultDuration,
-    updateSelectedPlaylistScope,
     updateSelectedPlaylistSettings,
     updateSelectedPlaylistWebTimeout,
     updateSelectedSharedPlaylist

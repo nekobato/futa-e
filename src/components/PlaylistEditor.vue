@@ -1,9 +1,9 @@
 <template>
-  <div class="panel-content">
-    <section class="playlist-items-shell">
-      <div class="playlist-items-header">
+  <div class="panel-content" :class="{ 'is-compact': compact }">
+    <section class="playlist-items-shell" aria-label="プレイリスト項目">
+      <div v-if="showHeader" class="playlist-items-header">
         <div class="playlist-items-copy">
-          <strong class="playlist-items-title">プレイリスト項目</strong>
+          <strong class="playlist-items-title">{{ heading }}</strong>
           <p v-if="singleItemMode" class="playlist-meta">
             追加すると現在の項目を置き換えます。
           </p>
@@ -20,84 +20,132 @@
         </ElButton>
       </div>
 
-      <p
-        v-if="playlist.length === 0"
-        class="playlist-meta playlist-empty-state"
-      >
-        {{ emptyMessage }}
-      </p>
-
-      <ElTimeline
-        v-else
+      <div
         data-testid="playlist-item-timeline"
-        class="playlist-list playlist-timeline"
+        class="track-scroll"
+        :class="{
+          'is-empty': playlist.length === 0,
+          'is-shuffle': shuffle
+        }"
+        role="region"
+        tabindex="0"
+        :aria-label="timelineAriaLabel"
       >
-        <ElTimelineItem
-          v-for="entry in timelineEntries"
-          :key="entry.item.id"
-          hide-timestamp
-        >
-          <div class="timeline-entry">
-            <div class="playlist-step">
-              <span class="playlist-step-index">
-                {{ timelineIndexLabel(entry.index) }}
-              </span>
-              <span class="playlist-step-copy">
-                {{ playbackMetaLabel(entry.item) }}
-              </span>
-            </div>
+        <p v-if="playlist.length === 0" class="playlist-meta empty-message">
+          {{ emptyMessage }}
+        </p>
 
-            <div class="marker-track" aria-hidden="true">
-              <span class="playlist-marker" :class="`is-${entry.item.type}`">
-                <component :is="itemIcon(entry.item.type)" />
-              </span>
-            </div>
-
-            <div class="playlist-item">
-              <div class="playlist-item-header">
-                <div class="playlist-item-copy">
-                  <strong>{{ itemLabel(entry.item) }}</strong>
-                  <div class="playlist-meta">
-                    {{ itemSourceLabel(entry.item) }}
-                  </div>
-                  <div v-if="itemStateLabel(entry.item)" class="playlist-meta">
-                    {{ itemStateLabel(entry.item) }}
-                  </div>
+        <ol v-else class="item-track" @dragend="finishDrag">
+          <li
+            v-for="entry in timelineEntries"
+            :key="entry.item.id"
+            class="track-item"
+            :class="{
+              'is-dragging': draggedItemIndex === entry.index,
+              'is-drop-target': dropTargetIndex === entry.index,
+              'is-forever': getItemPlaybackMode(entry.item) === 'forever',
+              'is-unreachable': entry.isUnreachable
+            }"
+            :draggable="canReorderItems"
+            @dragstart="startDrag(entry.index, $event)"
+            @dragenter.prevent="markDropTarget(entry.index)"
+            @dragover.prevent
+            @drop.prevent="dropItem(entry.index)"
+          >
+            <article
+              class="item-card"
+              :class="`type-${entry.item.type}`"
+              :aria-label="timelineItemAriaLabel(entry)"
+            >
+              <div class="media-frame">
+                <img
+                  v-if="canShowMediaPreview(entry.item, 'image')"
+                  :key="previewKey(entry.item)"
+                  class="media-preview"
+                  :src="previewSource(entry.item)"
+                  alt=""
+                  width="320"
+                  height="180"
+                  loading="lazy"
+                  @error="handlePreviewError(entry.item)"
+                />
+                <video
+                  v-else-if="canShowMediaPreview(entry.item, 'video')"
+                  :key="previewKey(entry.item)"
+                  class="media-preview"
+                  :src="previewSource(entry.item)"
+                  aria-hidden="true"
+                  width="320"
+                  height="180"
+                  muted
+                  playsinline
+                  preload="metadata"
+                  @error="handlePreviewError(entry.item)"
+                />
+                <div v-else class="preview-placeholder" aria-hidden="true">
+                  <component
+                    :is="itemIcon(entry.item.type)"
+                    class="media-icon"
+                  />
+                  <span v-if="entry.item.type === 'web'" class="web-host">
+                    {{ webHost(entry.item) }}
+                  </span>
                 </div>
-                <ElTag
-                  v-if="getItemPlaybackMode(entry.item) === 'forever'"
-                  type="info"
-                >
-                  無期限
-                </ElTag>
+                <span class="sequence-number">
+                  {{ timelineIndexLabel(entry.index) }}
+                </span>
+                <span class="media-type">{{ itemTypeLabel(entry.item) }}</span>
+                <span v-if="entry.isUnreachable" class="reachability-warning">
+                  <WarningFilled aria-hidden="true" />
+                  到達しません
+                </span>
               </div>
 
-              <div class="playlist-item-actions">
+              <div class="item-copy">
+                <strong :title="itemLabel(entry.item)">
+                  {{ itemLabel(entry.item) }}
+                </strong>
+                <span class="playback-chip">
+                  {{ playbackMetaLabel(entry.item) }}
+                </span>
+                <span class="source-label" :title="itemSourceLabel(entry.item)">
+                  {{ itemSourceLabel(entry.item) }}
+                </span>
+                <span
+                  v-if="entry.item.type === 'web' && entry.item.fallbackSrc"
+                  class="fallback-strip"
+                  :title="itemStateLabel(entry.item)"
+                >
+                  fallbackあり
+                </span>
+              </div>
+
+              <div class="item-actions">
                 <ElButton
                   :icon="EditPen"
                   text
                   circle
                   type="info"
-                  aria-label="項目を編集"
+                  :aria-label="`${itemLabel(entry.item)}を編集`"
                   @click="openEditDialog(entry.index)"
                 />
                 <ElButton
                   v-if="!singleItemMode"
-                  :icon="ArrowUp"
+                  :icon="ArrowLeft"
                   text
                   circle
                   type="info"
-                  aria-label="項目を上へ移動"
+                  :aria-label="`${itemLabel(entry.item)}を前へ移動`"
                   :disabled="entry.index === 0"
                   @click="moveItem(entry.index, -1)"
                 />
                 <ElButton
                   v-if="!singleItemMode"
-                  :icon="ArrowDown"
+                  :icon="ArrowRight"
                   text
                   circle
                   type="info"
-                  aria-label="項目を下へ移動"
+                  :aria-label="`${itemLabel(entry.item)}を後ろへ移動`"
                   :disabled="entry.index === playlist.length - 1"
                   @click="moveItem(entry.index, 1)"
                 />
@@ -106,14 +154,36 @@
                   text
                   circle
                   type="danger"
-                  aria-label="項目を削除"
-                  @click="removeItem(entry.index)"
+                  :aria-label="`${itemLabel(entry.item)}を削除`"
+                  @click="confirmRemoveItem(entry.index)"
                 />
               </div>
-            </div>
-          </div>
-        </ElTimelineItem>
-      </ElTimeline>
+
+              <span
+                v-if="getItemPlaybackMode(entry.item) === 'forever'"
+                class="forever-cap"
+                aria-label="この項目で再生を継続"
+              >
+                ∞
+              </span>
+            </article>
+          </li>
+        </ol>
+
+        <button
+          type="button"
+          class="add-card"
+          :class="{ 'is-drop-target': dropTargetIndex === playlist.length }"
+          data-testid="playlist-item-add-card"
+          @click="openDraftDialog"
+          @dragenter.prevent="markDropTarget(playlist.length)"
+          @dragover.prevent
+          @drop.prevent="dropItem(playlist.length)"
+        >
+          <Plus aria-hidden="true" />
+          <span>項目を追加</span>
+        </button>
+      </div>
     </section>
 
     <ElDialog
@@ -158,10 +228,12 @@
           <ElInput
             :id="urlInputId"
             v-model="urlInput"
+            name="playlist-item-url"
             type="url"
             inputmode="url"
+            autocomplete="off"
             size="small"
-            placeholder="https://example.com/asset"
+            placeholder="https://example.com/asset…"
             class="w-full"
             :aria-describedby="
               draftType === 'web' ? webUrlDescriptionIds : undefined
@@ -207,6 +279,7 @@
         <div v-if="showDraftDuration" class="field">
           <label :id="playbackModeLabelId">表示方法</label>
           <ElSegmented
+            :key="draftType"
             :id="playbackModeSegmentedId"
             :model-value="draftPlaybackMode"
             :options="playbackModeOptions"
@@ -321,8 +394,8 @@
 
 <script setup lang="ts">
 import {
-  ArrowDown,
-  ArrowUp,
+  ArrowLeft,
+  ArrowRight,
   Check,
   Close,
   Delete,
@@ -331,14 +404,21 @@ import {
   Monitor,
   Picture,
   Plus,
-  VideoCamera
+  VideoCamera,
+  WarningFilled
 } from '@element-plus/icons-vue'
-import { computed, ref } from 'vue'
+import { ElMessageBox } from 'element-plus'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { getFutaeApi } from '../shared/api'
+import { isBundledMediaSource } from '../shared/local-assets'
 import {
   getItemPlaybackMode,
   normalizePlaylistItemPlaybackMode
 } from '../shared/playback'
+import {
+  findFixedSequenceStopIndex,
+  movePlaylistItem
+} from '../shared/playlist-items'
 import type {
   AssetType,
   PickedAsset,
@@ -358,6 +438,7 @@ type ItemDialogMode = 'add' | 'edit'
 type PlaylistTimelineEntry = {
   item: PlaylistItem
   index: number
+  isUnreachable: boolean
 }
 
 const props = withDefaults(
@@ -368,11 +449,19 @@ const props = withDefaults(
     allowFallback?: boolean
     showDraftDuration?: boolean
     emptyMessage?: string
+    heading?: string
+    showHeader?: boolean
+    compact?: boolean
+    shuffle?: boolean
   }>(),
   {
     allowFallback: true,
     showDraftDuration: true,
-    emptyMessage: 'まだ項目がありません。ファイルや URL を追加してください。'
+    emptyMessage: 'まだ項目がありません。ファイルや URL を追加してください。',
+    heading: 'プレイリスト項目',
+    showHeader: true,
+    compact: false,
+    shuffle: false
   }
 )
 
@@ -411,6 +500,12 @@ const draftMute = ref(false)
 const dialogMode = ref<ItemDialogMode>('add')
 const editingItemIndex = ref<number | null>(null)
 const isDraftDialogVisible = ref(false)
+const draggedItemIndex = ref<number | null>(null)
+const dropTargetIndex = ref<number | null>(null)
+const previewFailures = ref<ReadonlySet<string>>(new Set())
+const previewRetryCounts = ref<Readonly<Record<string, number>>>({})
+const previewRetryTimers = new Set<number>()
+const scheduledPreviewRetries = new Set<string>()
 
 const typeOptions: Array<{ label: string; value: AssetType }> = [
   { label: '画像', value: 'image' },
@@ -449,6 +544,9 @@ const playbackModeNote = computed(() => {
 })
 
 const singleItemMode = computed(() => props.maxItems === 1)
+const canReorderItems = computed(
+  () => !singleItemMode.value && props.playlist.length > 1
+)
 const singleDraftSelectionMode = computed(
   () => singleItemMode.value || dialogMode.value === 'edit'
 )
@@ -475,11 +573,17 @@ const selectedAssetsLabel = computed(() => {
   return `${draftAssets.value.length} 件選択中`
 })
 
-/** Decorates playlist items with indices for the Timeline component. */
+const fixedSequenceStopIndex = computed(() =>
+  findFixedSequenceStopIndex(props.playlist, props.shuffle)
+)
+
+/** Decorates playlist items with ordering and reachability metadata. */
 const timelineEntries = computed<PlaylistTimelineEntry[]>(() =>
   props.playlist.map((item, index) => ({
     item,
-    index
+    index,
+    isUnreachable:
+      fixedSequenceStopIndex.value >= 0 && index > fixedSequenceStopIndex.value
   }))
 )
 const draftFallbackLabel = computed(() =>
@@ -515,7 +619,79 @@ const itemIcons = {
 
 const itemIcon = (type: AssetType) => itemIcons[type]
 
+const timelineAriaLabel = computed(() =>
+  props.shuffle
+    ? 'プレイリスト項目の管理順。再生順はShuffleにより毎回変わります。'
+    : 'プレイリスト項目の再生順'
+)
+
+const itemTypeLabel = (item: PlaylistItem) =>
+  ({ image: '画像', video: '動画', web: 'Web' })[item.type]
+
 const timelineIndexLabel = (index: number) => String(index + 1).padStart(2, '0')
+
+const timelineItemAriaLabel = (entry: PlaylistTimelineEntry) => {
+  const position = props.shuffle
+    ? `管理順${entry.index + 1}番、再生順はランダム`
+    : `${entry.index + 1}番目`
+  const reachability = entry.isUnreachable
+    ? '、先行する無期限項目で再生が止まるため到達しません'
+    : ''
+
+  return `${position}、${itemLabel(entry.item)}${reachability}`
+}
+
+/** Resolves a media source for a non-interactive card preview. */
+const previewSource = (item: PlaylistItem): string => {
+  if (isBundledMediaSource(item.src)) {
+    return new URL(
+      item.src.replace(/^\/+/, ''),
+      window.location.href
+    ).toString()
+  }
+
+  return isDirectMediaUrl(item.src) ? item.src : api.assets.toUrl(item.src)
+}
+
+const previewKey = (item: PlaylistItem) =>
+  `${item.id}:${previewRetryCounts.value[item.id] ?? 0}`
+
+const canShowMediaPreview = (item: PlaylistItem, type: 'image' | 'video') =>
+  item.type === type && !previewFailures.value.has(item.id)
+
+const webHost = (item: PlaylistItem) => {
+  try {
+    return new URL(item.src).hostname
+  } catch {
+    return 'Web'
+  }
+}
+
+/** Retries newly registered local assets once the debounced config save lands. */
+const handlePreviewError = (item: PlaylistItem) => {
+  const retryCount = previewRetryCounts.value[item.id] ?? 0
+  const isLocalAsset =
+    !isBundledMediaSource(item.src) && !isDirectMediaUrl(item.src)
+
+  if (isLocalAsset && retryCount < 2 && !scheduledPreviewRetries.has(item.id)) {
+    scheduledPreviewRetries.add(item.id)
+    const timer = window.setTimeout(
+      () => {
+        previewRetryTimers.delete(timer)
+        scheduledPreviewRetries.delete(item.id)
+        previewRetryCounts.value = {
+          ...previewRetryCounts.value,
+          [item.id]: retryCount + 1
+        }
+      },
+      240 * (retryCount + 1)
+    )
+    previewRetryTimers.add(timer)
+    return
+  }
+
+  previewFailures.value = new Set([...previewFailures.value, item.id])
+}
 
 const playbackMetaLabel = (item: PlaylistItem) => {
   const playbackMode = getItemPlaybackMode(item)
@@ -912,19 +1088,93 @@ const fallbackLabel = (src?: string, name?: string) =>
 
 const moveItem = (index: number, direction: -1 | 1) => {
   const nextIndex = index + direction
-  if (nextIndex < 0 || nextIndex >= props.playlist.length) {
+  const next = movePlaylistItem(props.playlist, index, nextIndex)
+
+  if (next === props.playlist) {
     return
   }
 
-  const next = [...props.playlist]
-  const [item] = next.splice(index, 1)
-  next.splice(nextIndex, 0, item)
   emitPlaylist(next)
+}
+
+/** Starts a pointer drag while retaining button-based keyboard reordering. */
+const startDrag = (index: number, event: DragEvent) => {
+  if (!canReorderItems.value) {
+    event.preventDefault()
+    return
+  }
+
+  draggedItemIndex.value = index
+  dropTargetIndex.value = index
+
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(index))
+  }
+}
+
+/** Marks the target slot used by the current pointer drag. */
+const markDropTarget = (index: number) => {
+  if (draggedItemIndex.value !== null) {
+    dropTargetIndex.value = index
+  }
+}
+
+/** Moves a dragged item to a concrete sequence index. */
+const dropItem = (targetIndex: number) => {
+  const sourceIndex = draggedItemIndex.value
+
+  if (sourceIndex === null || sourceIndex === targetIndex) {
+    finishDrag()
+    return
+  }
+
+  const next = movePlaylistItem(props.playlist, sourceIndex, targetIndex)
+
+  if (next !== props.playlist) {
+    emitPlaylist(next)
+  }
+
+  finishDrag()
+}
+
+/** Clears transient drag affordances after a drop or cancellation. */
+const finishDrag = () => {
+  draggedItemIndex.value = null
+  dropTargetIndex.value = null
 }
 
 const removeItem = (index: number) => {
   emitPlaylist(props.playlist.filter((_, itemIndex) => itemIndex !== index))
 }
+
+/** Requires an explicit confirmation before autosaved content is removed. */
+const confirmRemoveItem = async (index: number) => {
+  const item = props.playlist[index]
+  if (!item) {
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `「${itemLabel(item)}」をプレイリストから削除します。元に戻せません。`,
+      '項目を削除',
+      {
+        confirmButtonText: '削除',
+        cancelButtonText: 'キャンセル',
+        type: 'warning'
+      }
+    )
+  } catch {
+    return
+  }
+
+  removeItem(index)
+}
+
+onBeforeUnmount(() => {
+  previewRetryTimers.forEach((timer) => window.clearTimeout(timer))
+})
 </script>
 
 <style lang="scss">
@@ -1080,68 +1330,395 @@ const removeItem = (index: number) => {
   box-shadow: 0 0 0 4px var(--focus-ring);
 }
 
-.playlist-list {
-  max-height: 360px;
-  overflow: auto;
-  padding-right: 4px;
-  gap: 16px;
-}
+.panel-content {
+  container-type: inline-size;
+  min-width: 0;
 
-.playlist-timeline {
-  display: block;
-  width: 100%;
+  .track-scroll {
+    display: flex;
+    align-items: stretch;
+    gap: 22px;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: clip;
+    padding: 8px 4px 12px;
+    scrollbar-gutter: stable;
+    overscroll-behavior-inline: contain;
 
-  &.el-timeline {
-    padding-left: 0;
+    &:focus-visible {
+      outline: 2px solid var(--focus-line);
+      outline-offset: 3px;
+      box-shadow: 0 0 0 4px var(--focus-ring);
+    }
+
+    &::-webkit-scrollbar {
+      height: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--panel-soft), transparent 34%);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--muted), transparent 28%);
+      background-clip: padding-box;
+    }
   }
 
-  .el-timeline-item__tail,
-  .el-timeline-item__node {
-    display: none;
+  .track-scroll.is-empty {
+    align-items: center;
+    min-height: 174px;
   }
 
-  .el-timeline-item.is-start .el-timeline-item__wrapper {
-    position: static;
-    top: 0;
-    padding-left: 0;
+  .empty-message {
+    flex: 0 1 280px;
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--panel-soft), transparent 34%);
   }
-}
 
-.timeline-entry {
-  display: grid;
-  grid-template-columns: minmax(96px, 128px) 62px minmax(0, 1fr);
-  align-items: stretch;
-  width: 100%;
-}
+  .item-track {
+    display: flex;
+    align-items: stretch;
+    gap: 22px;
+    min-width: max-content;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
 
-.marker-track {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  min-height: 34px;
+  .track-item {
+    position: relative;
+    flex: 0 0 184px;
+    min-width: 0;
+    transition:
+      opacity 120ms ease,
+      transform 120ms ease;
 
-  &::after {
-    content: '';
+    &:not(:last-child)::after {
+      content: '›';
+      position: absolute;
+      inset-block-start: 53px;
+      inset-inline-end: -16px;
+      color: color-mix(in srgb, var(--muted), transparent 18%);
+      font-family: var(--font-display);
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    &.is-dragging {
+      opacity: 0.42;
+      transform: scale(0.98);
+    }
+
+    &.is-drop-target .item-card {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--focus-ring);
+    }
+
+    &.is-unreachable .item-card {
+      border-style: dashed;
+      border-color: color-mix(
+        in srgb,
+        var(--el-color-warning),
+        var(--line) 48%
+      );
+      background: color-mix(in srgb, var(--surface-strong), var(--panel) 26%);
+    }
+  }
+
+  .item-card {
+    position: relative;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 214px;
+    overflow: clip;
+    border: 1px solid var(--line-strong);
+    border-radius: 13px;
+    background: color-mix(in srgb, var(--surface-strong), var(--panel) 10%);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--shadow), transparent 58%);
+  }
+
+  .media-frame {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 16 / 9;
+    overflow: clip;
+    border-bottom: 1px solid var(--line-subtle);
+    background: color-mix(
+      in srgb,
+      var(--accent-soft),
+      var(--surface-strong) 64%
+    );
+    color: color-mix(in srgb, var(--accent), var(--ink) 18%);
+  }
+
+  .media-preview,
+  .preview-placeholder {
+    width: 100%;
+    height: 100%;
+  }
+
+  .media-preview {
+    display: block;
+    object-fit: cover;
+  }
+
+  .preview-placeholder {
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 7px;
+    padding: 12px;
+  }
+
+  .type-video .media-frame {
+    background: color-mix(
+      in srgb,
+      var(--el-color-warning-light-9),
+      var(--surface-strong) 58%
+    );
+    color: color-mix(in srgb, var(--el-color-warning-dark-2), var(--ink) 18%);
+  }
+
+  .type-web .media-frame {
+    background: color-mix(
+      in srgb,
+      var(--el-color-info-light-9),
+      var(--surface-strong) 56%
+    );
+    color: color-mix(in srgb, var(--el-color-info-dark-2), var(--ink) 16%);
+  }
+
+  .media-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .web-host {
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 0.86rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sequence-number,
+  .media-type {
     position: absolute;
-    z-index: 0;
-    top: 34px;
-    bottom: -20px;
-    width: 2px;
-    background: color-mix(in srgb, var(--line-strong), var(--accent) 26%);
+    inset-block-start: 8px;
+    display: inline-flex;
+    align-items: center;
+    min-height: 23px;
+    padding-inline: 7px;
+    border: 1px solid color-mix(in srgb, var(--line-strong), transparent 18%);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--surface-strong), transparent 8%);
+    font-size: 0.86rem;
+    font-weight: 700;
+    backdrop-filter: blur(6px);
+  }
+
+  .sequence-number {
+    inset-inline-start: 8px;
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .media-type {
+    inset-inline-end: 8px;
+    color: var(--muted);
+  }
+
+  .item-copy {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-content: start;
+    gap: 5px 8px;
+    min-width: 0;
+    padding: 11px 11px 8px;
+
+    strong {
+      min-width: 0;
+      overflow: clip;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+  }
+
+  .playback-chip {
+    justify-self: end;
+    color: color-mix(in srgb, var(--ink), var(--accent) 24%);
+    font-family: var(--font-display);
+    font-size: 0.86rem;
+    line-height: 1.35;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .source-label {
+    grid-column: 1 / -1;
+    overflow: clip;
+    color: var(--muted);
+    font-size: 0.86rem;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fallback-strip {
+    grid-column: 1 / -1;
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    min-height: 20px;
+    padding-inline: 7px;
+    border-inline-start: 3px solid var(--el-color-info);
+    border-radius: 4px;
+    background: color-mix(
+      in srgb,
+      var(--el-color-info-light-9),
+      transparent 16%
+    );
+    color: var(--muted);
+    font-size: 0.86rem;
+  }
+
+  .reachability-warning {
+    position: absolute;
+    inset-inline: 8px;
+    inset-block-end: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 25px;
+    padding-inline: 8px;
+    border: 1px solid
+      color-mix(in srgb, var(--el-color-warning), transparent 34%);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--surface-strong), transparent 6%);
+    color: color-mix(in srgb, var(--el-color-warning), var(--ink) 36%);
+    font-size: 0.86rem;
+    font-weight: 700;
+    backdrop-filter: blur(8px);
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+
+  .item-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1px;
+    padding: 5px 6px;
+    border-top: 1px solid var(--line-subtle);
+
+    :where(.el-button) {
+      width: 32px;
+      height: 32px;
+    }
+  }
+
+  .forever-cap {
+    position: absolute;
+    inset-block-start: 47px;
+    inset-inline-end: 8px;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 27px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--ink), transparent 8%);
+    color: var(--surface-strong);
+    font-family: var(--font-display);
+    font-size: 21px;
+    line-height: 1;
+  }
+
+  .add-card {
+    appearance: none;
+    flex: 0 0 132px;
+    min-height: 214px;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 8px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 13px;
+    background: color-mix(in srgb, var(--surface-strong), transparent 42%);
+    color: var(--muted);
+    cursor: pointer;
+    transition:
+      border-color 120ms ease,
+      color 120ms ease,
+      background 120ms ease;
+
+    svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    span {
+      font-size: 0.86rem;
+      font-weight: 600;
+    }
+
+    &:hover,
+    &.is-drop-target {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent-soft), transparent 44%);
+      color: var(--ink);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-line);
+      outline-offset: 3px;
+      box-shadow: 0 0 0 4px var(--focus-ring);
+    }
+  }
+
+  &.is-compact {
+    gap: 0;
+
+    .playlist-items-shell {
+      gap: 0;
+    }
   }
 }
 
-.playlist-timeline .el-timeline-item:last-child .marker-track::after {
-  display: none;
+@container (max-width: 679px) {
+  .panel-content {
+    .track-item {
+      flex-basis: 168px;
+    }
+
+    .item-card,
+    .add-card {
+      min-height: 198px;
+    }
+  }
 }
 
-.playlist-item {
-  display: grid;
-  gap: 12px;
-  width: 100%;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--surface-strong), var(--panel) 16%);
+@media (prefers-reduced-motion: reduce) {
+  .panel-content {
+    .track-item,
+    .add-card {
+      transition: none;
+    }
+  }
 }
 
 .playlist-dialog {
@@ -1170,100 +1747,5 @@ const removeItem = (index: number) => {
 
 .playlist-dialog-note {
   margin: 0;
-}
-
-.playlist-item-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-
-  :where(.el-tag) {
-    flex: 0 0 auto;
-  }
-
-  strong {
-    min-width: 0;
-    text-wrap: balance;
-  }
-}
-
-.playlist-item-copy {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.playlist-step {
-  display: grid;
-  gap: 4px;
-  justify-items: end;
-  align-self: start;
-  padding: 4px 0 20px;
-  text-align: right;
-}
-
-.playlist-step-index {
-  font-family: var(--font-display);
-  font-size: 19px;
-  line-height: 1;
-  color: color-mix(in srgb, var(--ink), var(--accent) 22%);
-}
-
-.playlist-step-copy {
-  font-size: 12px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.playlist-marker {
-  position: relative;
-  z-index: 1;
-  width: 34px;
-  height: 34px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 999px;
-  border: 1px solid
-    color-mix(in srgb, var(--line-strong), var(--surface-strong) 20%);
-  color: var(--ink);
-  background: color-mix(in srgb, var(--surface-strong), var(--panel) 24%);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--shadow), transparent 42%);
-
-  :where(svg) {
-    width: 16px;
-    height: 16px;
-  }
-
-  &.is-image {
-    color: color-mix(in srgb, var(--accent), var(--ink) 16%);
-    background: color-mix(
-      in srgb,
-      var(--accent-soft),
-      var(--surface-strong) 28%
-    );
-  }
-
-  &.is-video {
-    color: color-mix(in srgb, var(--el-color-warning-dark-2), var(--ink) 12%);
-    background: color-mix(
-      in srgb,
-      var(--el-color-warning-light-9),
-      var(--accent-warm) 24%
-    );
-  }
-
-  &.is-web {
-    color: color-mix(in srgb, var(--el-color-info-dark-2), var(--ink) 12%);
-    background: color-mix(
-      in srgb,
-      var(--el-color-info-light-9),
-      var(--surface-strong) 22%
-    );
-  }
-}
-
-.playlist-item-actions {
-  justify-content: flex-end;
 }
 </style>

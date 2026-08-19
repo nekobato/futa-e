@@ -96,6 +96,15 @@ playlist item は少なくとも次の情報を持つ。
 - OSログイン時には操作画面とメニューバーを起動し、Kioskは自動開始しない
 - Kiosk実行状態はprocess内だけで管理し、アプリまたはOSの再起動後には復元しない
 
+## Kiosk終了ショートカット
+
+- Electronのaccelerator形式でグローバルショートカットを設定できる
+- 既定値は`CommandOrControl+Shift+K`とする
+- アプリ起動時に`globalShortcut`へ登録し、設定変更時は新しいacceleratorの登録に成功してから以前の登録を解除する
+- 無効な書式またはほかのアプリとの競合により登録できない場合は、以前の設定と登録を維持する
+- アプリ終了時に登録を解除する
+- `Escape`キーを2秒以内に3回押す終了方法とメニューバー操作も維持する
+
 ## 設定データの考え方
 
 ローカル設定の形式は、当面は次のような形を想定する。
@@ -126,6 +135,7 @@ type PlaylistConfig = {
 
 type PlayerConfig = {
   version: 1
+  kioskExitShortcut: string
   activePlaylistId: string
   playlists: PlaylistConfig[]
   displays: Record<string, DisplayConfig>

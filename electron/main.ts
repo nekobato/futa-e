@@ -2,6 +2,7 @@ import {
   app,
   BrowserWindow,
   dialog,
+  globalShortcut,
   ipcMain,
   Menu,
   nativeImage,
@@ -34,6 +35,7 @@ import {
   shouldBlockPlayerWindowEscape
 } from './player-window-input'
 import { createLaunchAtLoginController } from './login-item'
+import { createKioskExitShortcutController } from './kiosk-exit-shortcut'
 import {
   planPlayerWindowReconciliation,
   selectPlayerTargetDisplays
@@ -51,6 +53,7 @@ import {
 import { collectAllowedLocalAssets } from './local-asset-config'
 import { getLocalAssetRegistry } from './local-assets'
 import { createLocalMediaProtocolHandler } from './local-media-protocol'
+import { parseKioskExitShortcutInput } from '../src/shared/kiosk-exit-shortcut'
 
 const APP_NAME = 'Futa E'
 const LOCAL_MEDIA_SCHEME = 'futae-media'
@@ -89,6 +92,14 @@ let deepLinksReady = false
 const queuedDeepLinkCommands: DeepLinkCommand[] = []
 let closePlayerWindowsTask: Promise<void> | null = null
 const launchAtLoginController = createLaunchAtLoginController(app)
+const kioskExitShortcutController = createKioskExitShortcutController(
+  globalShortcut,
+  () => {
+    if (playerModeActive) {
+      void exitPlayerMode()
+    }
+  }
+)
 
 /** Returns the bundled preload script path from the current application root. */
 const getPreloadPath = () =>
@@ -336,8 +347,8 @@ const listDisplays = (): DisplayInfo[] => {
 
 const createControlWindow = () => {
   controlWindow = createWindow('control', {
-    width: 800,
-    height: 600,
+    width: 1180,
+    height: 760,
     minWidth: 800,
     minHeight: 600,
     title: APP_NAME
@@ -564,7 +575,7 @@ const restoreControlWindow = () => {
   controlWindow.moveTop()
 }
 
-const exitPlayerMode = async () => {
+async function exitPlayerMode() {
   playerModeActive = false
   playerModeInitialDisplayIds.clear()
   await playerWindowReconcileTask.catch((error) => {
@@ -697,9 +708,58 @@ const flushQueuedDeepLinkCommands = () => {
   commands.forEach(dispatchDeepLinkCommand)
 }
 
-const updateConfig = async (next: PlayerConfig): Promise<PlayerConfig> => {
+const createKioskExitShortcutError = (
+  reason: 'invalid' | 'unavailable'
+): Error =>
+  new Error(
+    reason === 'invalid'
+      ? 'Kiosk終了ショートカットの書式が正しくありません。'
+      : 'Kiosk終了ショートカットはほかのアプリで使用されています。'
+  )
+
+const updateConfig = async (
+  next: PlayerConfig,
+  {
+    forceKioskExitShortcutRegistration = false
+  }: {
+    forceKioskExitShortcutRegistration?: boolean
+  } = {}
+): Promise<PlayerConfig> => {
   const normalized = coerceConfig(next)
-  editableConfig = await saveConfig(normalized)
+  const previousActiveAccelerator =
+    kioskExitShortcutController.getActiveAccelerator()
+  const shouldRegisterShortcut =
+    forceKioskExitShortcutRegistration ||
+    normalized.kioskExitShortcut !== editableConfig.kioskExitShortcut
+
+  if (shouldRegisterShortcut) {
+    const result = kioskExitShortcutController.set(normalized.kioskExitShortcut)
+    if (!result.ok) {
+      throw createKioskExitShortcutError(result.reason)
+    }
+  }
+
+  try {
+    editableConfig = await saveConfig(normalized)
+  } catch (error) {
+    if (shouldRegisterShortcut) {
+      if (previousActiveAccelerator) {
+        const rollbackResult = kioskExitShortcutController.set(
+          previousActiveAccelerator
+        )
+        if (!rollbackResult.ok) {
+          console.error(
+            'Failed to restore the previous Kiosk exit shortcut.',
+            rollbackResult.reason
+          )
+        }
+      } else {
+        kioskExitShortcutController.deactivate()
+      }
+    }
+    throw error
+  }
+
   playbackConfig = await loadPlaybackConfig()
 
   if (playerModeActive) {
@@ -733,6 +793,16 @@ if (hasSingleInstanceLock) {
     editableConfig = await loadConfig()
     playbackConfig = await loadPlaybackConfig()
 
+    const shortcutResult = kioskExitShortcutController.set(
+      editableConfig.kioskExitShortcut
+    )
+    if (!shortcutResult.ok) {
+      console.error(
+        'Failed to register the configured Kiosk exit shortcut.',
+        shortcutResult.reason
+      )
+    }
+
     createControlWindow()
     createStatusTray()
     deepLinksReady = true
@@ -763,6 +833,7 @@ app.on('activate', () => {
 
 app.on('will-quit', () => {
   playerModeActive = false
+  kioskExitShortcutController.deactivate()
   if (displayChangeTimer) {
     clearTimeout(displayChangeTimer)
     displayChangeTimer = null
@@ -812,4 +883,28 @@ ipcMain.handle('system:get-launch-at-login', async () =>
 
 ipcMain.handle('system:set-launch-at-login', async (_event, enabled: boolean) =>
   launchAtLoginController.set(enabled)
+)
+
+ipcMain.handle('system:get-kiosk-exit-shortcut', async () =>
+  kioskExitShortcutController.get(editableConfig.kioskExitShortcut)
+)
+
+ipcMain.handle(
+  'system:set-kiosk-exit-shortcut',
+  async (_event, value: unknown) => {
+    const accelerator = parseKioskExitShortcutInput(value)
+    if (!accelerator) {
+      throw createKioskExitShortcutError('invalid')
+    }
+
+    const config = await updateConfig(
+      {
+        ...editableConfig,
+        kioskExitShortcut: accelerator
+      },
+      { forceKioskExitShortcutRegistration: true }
+    )
+
+    return kioskExitShortcutController.get(config.kioskExitShortcut)
+  }
 )

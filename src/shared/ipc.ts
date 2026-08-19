@@ -20,6 +20,11 @@ export type LaunchAtLoginSettings = {
   enabled: boolean
 }
 
+export type KioskExitShortcutSettings = {
+  accelerator: string
+  registered: boolean
+}
+
 export type FutaeApi = {
   config: {
     get: () => Promise<PlayerConfig>
@@ -45,5 +50,9 @@ export type FutaeApi = {
   system: {
     getLaunchAtLogin: () => Promise<LaunchAtLoginSettings>
     setLaunchAtLogin: (enabled: boolean) => Promise<LaunchAtLoginSettings>
+    getKioskExitShortcut: () => Promise<KioskExitShortcutSettings>
+    setKioskExitShortcut: (
+      accelerator: string
+    ) => Promise<KioskExitShortcutSettings>
   }
 }

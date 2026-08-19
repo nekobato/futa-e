@@ -18,7 +18,7 @@
           <div class="display-copy">
             <strong>{{ display.label }}</strong>
             <span class="surface-note">
-              {{ display.bounds.width }} x {{ display.bounds.height }}
+              {{ display.bounds.width }} × {{ display.bounds.height }}
             </span>
           </div>
 

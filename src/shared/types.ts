@@ -30,6 +30,7 @@ export type PlaylistConfig = {
 
 export type PlayerConfig = {
   version: 1
+  kioskExitShortcut: string
   activePlaylistId: string
   playlists: PlaylistConfig[]
   displays: Record<string, DisplayConfig>

@@ -31,7 +31,15 @@ const createPreloadApi = (): FutaeApi => ({
   },
   system: {
     getLaunchAtLogin: async () => ({ supported: true, enabled: false }),
-    setLaunchAtLogin: async (enabled) => ({ supported: true, enabled })
+    setLaunchAtLogin: async (enabled) => ({ supported: true, enabled }),
+    getKioskExitShortcut: async () => ({
+      accelerator: 'CommandOrControl+Shift+K',
+      registered: true
+    }),
+    setKioskExitShortcut: async (accelerator) => ({
+      accelerator,
+      registered: true
+    })
   }
 })
 

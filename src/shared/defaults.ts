@@ -6,6 +6,10 @@ import type {
   PlaylistItem
 } from './types'
 import { getItemPlaybackMode, isPlaylistItemPlaybackMode } from './playback'
+import {
+  coerceKioskExitShortcut,
+  DEFAULT_KIOSK_EXIT_SHORTCUT
+} from './kiosk-exit-shortcut'
 import { clampNumber, createId, isRecord } from './utils'
 
 /**
@@ -58,6 +62,7 @@ export const createDefaultConfig = (): PlayerConfig => {
 
   return {
     version: 1,
+    kioskExitShortcut: DEFAULT_KIOSK_EXIT_SHORTCUT,
     activePlaylistId: playlists[0]?.id ?? createId(),
     playlists,
     displays: {},
@@ -359,6 +364,7 @@ export const coerceConfig = (raw: unknown): PlayerConfig => {
 
   return {
     version: 1,
+    kioskExitShortcut: coerceKioskExitShortcut(source.kioskExitShortcut),
     activePlaylistId,
     playlists,
     displays,

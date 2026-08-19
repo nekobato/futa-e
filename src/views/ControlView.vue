@@ -1,5 +1,7 @@
 <template>
   <div class="control-layout">
+    <a class="skip-link" href="#main-content">主要設定へ移動</a>
+
     <header class="control-pagebar">
       <div class="control-pagebar-brand">
         <img
@@ -36,7 +38,12 @@
       </div>
     </header>
 
-    <main v-if="isTutorialVisible" class="tutorial-main">
+    <main
+      v-if="isTutorialVisible"
+      id="main-content"
+      class="tutorial-main"
+      tabindex="-1"
+    >
       <section
         class="control-surface tutorial-surface"
         aria-labelledby="usage-title"
@@ -69,32 +76,47 @@
             <span class="tutorial-step-index">2</span>
             <div class="tutorial-step-copy">
               <strong>Playlistを整える</strong>
-              <p>画像・動画・Webを追加し、表示時間やループを調整します。</p>
+              <p>
+                画像・動画・Webを追加し、表示時間や固定順・Shuffleを調整します。
+              </p>
             </div>
           </li>
           <li>
             <span class="tutorial-step-index">3</span>
             <div class="tutorial-step-copy">
+              <strong>Displayごとの内容を決める</strong>
+              <p>
+                「Display別」にすると、接続中の画面を並べて内容を編集できます。
+              </p>
+            </div>
+          </li>
+          <li>
+            <span class="tutorial-step-index">4</span>
+            <div class="tutorial-step-copy">
               <strong>開始する</strong>
-              <p>「開始」を押すと、選択したDisplayでKiosk再生を始めます。</p>
+              <p>
+                「開始」でKiosk再生を始めます。終了は
+                <code translate="no">{{
+                  kioskExitShortcutSettings.accelerator
+                }}</code>
+                です。
+              </p>
             </div>
           </li>
         </ol>
       </section>
     </main>
 
-    <main v-else-if="isConfigReady" class="settings-main">
+    <main
+      v-else-if="isConfigReady"
+      id="main-content"
+      class="settings-main"
+      tabindex="-1"
+    >
       <DisplaySettingsPanel
         :display-infos="displayInfos"
         :displays="config.displays"
         @toggle-display="setDisplayEnabled"
-      />
-
-      <StartupSettingsPanel
-        :settings="launchAtLoginSettings"
-        :pending="launchAtLoginPending"
-        :error-message="launchAtLoginError"
-        @update="setLaunchAtLogin"
       />
 
       <PlaylistWorkbenchSection
@@ -102,7 +124,6 @@
         :display-infos="displayInfos"
         :selected-playlist="selectedPlaylist"
         :selected-playlist-index="selectedPlaylistIndex"
-        :selected-playlist-scope="selectedPlaylistScope"
         @add-playlist="addPlaylist"
         @duplicate-selected-playlist="duplicateSelectedPlaylist"
         @move-selected-playlist="moveSelectedPlaylist"
@@ -116,10 +137,23 @@
         @update-selected-playlist-default-duration="
           updateSelectedPlaylistDefaultDuration
         "
-        @update-selected-playlist-scope="updateSelectedPlaylistScope"
         @update-selected-playlist-settings="updateSelectedPlaylistSettings"
         @update-selected-playlist-web-timeout="updateSelectedPlaylistWebTimeout"
         @update-selected-shared-playlist="updateSelectedSharedPlaylist"
+      />
+
+      <StartupSettingsPanel
+        :settings="launchAtLoginSettings"
+        :pending="launchAtLoginPending"
+        :error-message="launchAtLoginError"
+        @update="setLaunchAtLogin"
+      />
+
+      <KioskShortcutSettingsPanel
+        :settings="kioskExitShortcutSettings"
+        :pending="kioskExitShortcutPending"
+        :error-message="kioskExitShortcutError"
+        @update="setKioskExitShortcut"
       />
     </main>
 
@@ -133,6 +167,7 @@
 import { ref } from 'vue'
 import { ArrowLeft, QuestionFilled, VideoPlay } from '@element-plus/icons-vue'
 import DisplaySettingsPanel from '../components/control/DisplaySettingsPanel.vue'
+import KioskShortcutSettingsPanel from '../components/control/KioskShortcutSettingsPanel.vue'
 import PlaylistWorkbenchSection from '../components/control/PlaylistWorkbenchSection.vue'
 import StartupSettingsPanel from '../components/control/StartupSettingsPanel.vue'
 import { useControlView } from '../composables/useControlView'
@@ -145,6 +180,9 @@ const {
   displayInfos,
   duplicateSelectedPlaylist,
   isConfigReady,
+  kioskExitShortcutError,
+  kioskExitShortcutPending,
+  kioskExitShortcutSettings,
   launchAtLoginError,
   launchAtLoginPending,
   launchAtLoginSettings,
@@ -154,16 +192,15 @@ const {
   selectPlaylist,
   selectedPlaylist,
   selectedPlaylistIndex,
-  selectedPlaylistScope,
   setActivePlaylist,
   setDisplayEnabled,
   setLaunchAtLogin,
+  setKioskExitShortcut,
   setSelectedDisplayPlaylistEnabled,
   startPlayer,
   toggleSelectedPlaylistPerDisplay,
   updateSelectedDisplayPlaylist,
   updateSelectedPlaylistDefaultDuration,
-  updateSelectedPlaylistScope,
   updateSelectedPlaylistSettings,
   updateSelectedPlaylistWebTimeout,
   updateSelectedSharedPlaylist
@@ -214,6 +251,27 @@ const handleStartPlayer = async () => {
   gap: 20px;
   width: min(1320px, 100%);
   animation: rise 480ms ease-out;
+
+  .skip-link {
+    position: fixed;
+    inset-block-start: 12px;
+    inset-inline-start: 12px;
+    z-index: 1000;
+    padding: 9px 13px;
+    border: 2px solid var(--focus-line);
+    border-radius: 9px;
+    background: var(--surface-strong);
+    color: var(--ink);
+    font-weight: 700;
+    text-decoration: none;
+    transform: translateY(-160%);
+
+    &:focus-visible {
+      outline: 3px solid var(--focus-ring);
+      outline-offset: 2px;
+      transform: translateY(0);
+    }
+  }
 
   .control-pagebar {
     display: flex;
@@ -267,6 +325,12 @@ const handleStartPlayer = async () => {
   .tutorial-main {
     min-width: 0;
     display: grid;
+  }
+
+  :where(.settings-main, .tutorial-main):focus-visible {
+    outline: 2px solid var(--focus-line);
+    outline-offset: 8px;
+    box-shadow: 0 0 0 4px var(--focus-ring);
   }
 
   .control-surface {
@@ -369,6 +433,12 @@ const handleStartPlayer = async () => {
       color: var(--muted);
       overflow-wrap: anywhere;
     }
+
+    code {
+      font-family:
+        ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.92em;
+    }
   }
 
   .surface-note {
@@ -377,6 +447,12 @@ const handleStartPlayer = async () => {
     line-height: 1.6;
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control-layout {
+    animation: none;
   }
 }
 </style>
