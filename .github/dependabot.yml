@@ -10,6 +10,10 @@ updates:
       timezone: 'Asia/Tokyo'
     cooldown:
       default-days: 7
+    ignore:
+      - dependency-name: 'typescript'
+        update-types:
+          - 'version-update:semver-major'
     groups:
       npm-version-updates:
         applies-to: 'version-updates'
