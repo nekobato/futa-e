@@ -24,7 +24,7 @@ Intel Mac、Windows、Linux 向けの配布物はありません。
 ### 必要なツール
 
 - Git
-- Node.js `>=22.14.0 <23`（`.nvmrc` は `22.14.0`）
+- Node.js `>=22.22.2 <23`（`.nvmrc` は `22.22.2`）
 - pnpm `>=9.15.0 <10`（`package.json` は `9.15.0` を指定）
 
 Corepack を利用すると、`package.json` の `packageManager` に従って pnpm のバージョンを揃えられます。
