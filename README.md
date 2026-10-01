@@ -46,7 +46,7 @@ Kiosk を終了するには、設定したグローバルショートカット�
 
 ## 開発
 
-Node.js `22.14.0` と pnpm `9.15.0` を使用します。
+Node.js `22.22.2` と pnpm `9.15.0` を使用します。
 
 ```bash
 git clone https://github.com/nekobato/futa-e.git
