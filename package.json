@@ -40,13 +40,13 @@
   "pnpm": {
     "overrides": {
       "source-map-js@<1.2.2": "1.2.2",
-      "vitepress>vite": "6.4.3"
+      "vitepress>vite": "6.4.4"
     }
   },
   "devDependencies": {
     "@types/node": "26.6.5",
     "@vitejs/plugin-vue": "6.0.10",
-    "electron": "44.9.0",
+    "electron": "44.9.1",
     "electron-builder": "26.17.0",
     "jsdom": "30.1.3",
     "prettier": "3.9.10",
