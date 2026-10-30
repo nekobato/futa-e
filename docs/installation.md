@@ -25,19 +25,25 @@ Intel Mac、Windows、Linux 向けの配布物はありません。
 
 - Git
 - Node.js `26.12.1`（`.node-version` と `.nvmrc` で選択）
-- pnpm `>=9.15.0 <10`（`package.json` は `9.15.0` を指定）
+- pnpm `12.16.1`（`package.json` の `packageManager` で固定）
 
-Node.js 26 には Corepack が同梱されません。以下は npm exec で `package.json` が指定する pnpm 9.15.0 を一時利用する手順です。
+Node.js `26.12.1` を有効にしてから、同梱の npm で pnpm をインストールします。
+Node.js 26 には Corepack が同梱されないため、pnpm を直接導入します。
 
 ```bash
 git clone https://github.com/nekobato/futa-e.git
 cd futa-e
-npm exec --yes --package=pnpm@9.15.0 -- pnpm --version
-npm exec --yes --package=pnpm@9.15.0 -- pnpm install --frozen-lockfile
-npm exec --yes --package=pnpm@9.15.0 -- pnpm dev
+npm install --global pnpm@12.16.1
+node --version
+pnpm --version
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
-`pnpm --version` が `9.15.0` であることを確認してください。`pnpm dev` は Vite の開発サーバーと Electron を起動します。
+`node --version` が `v26.12.1`、`pnpm --version` が `12.16.1` であることを確認してください。
+`pnpm dev` は Vite の開発サーバーと Electron を起動します。
+
+pnpm の依存バージョン上書きと、依存パッケージのインストールスクリプトの許可は `pnpm-workspace.yaml` で管理します。
 
 ## 開発時のコマンド
 

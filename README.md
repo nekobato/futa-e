@@ -46,12 +46,14 @@ Kiosk を終了するには、設定したグローバルショートカット�
 
 ## 開発
 
-Node.js `26.12.1` と pnpm `9.15.0` を使用します。
+Node.js `26.12.1` と pnpm `12.16.1` を使用します。
+Node.js を用意してから、npm で pnpm をインストールしてください。
 
 ```bash
 git clone https://github.com/nekobato/futa-e.git
 cd futa-e
-corepack enable pnpm
+npm install --global pnpm@12.16.1
+pnpm --version
 pnpm install --frozen-lockfile
 pnpm dev
 ```
