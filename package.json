@@ -7,10 +7,10 @@
     "type": "git",
     "url": "https://github.com/nekobato/futa-e.git"
   },
-  "packageManager": "pnpm@9.15.0",
+  "packageManager": "pnpm@12.16.1",
   "engines": {
-    "node": ">=22.23.4 <23",
-    "pnpm": ">=9.15.0 <10"
+    "node": ">=22.23.4 <23 || ^26.12.1",
+    "pnpm": ">=12.16.1 <13"
   },
   "main": "dist-electron/main.js",
   "scripts": {
@@ -36,12 +36,6 @@
     "electron-store": "12.0.0",
     "element-plus": "2.14.7",
     "vue": "3.5.44"
-  },
-  "pnpm": {
-    "overrides": {
-      "source-map-js@<1.2.2": "1.2.2",
-      "vitepress>vite": "6.4.4"
-    }
   },
   "devDependencies": {
     "@types/node": "26.6.5",

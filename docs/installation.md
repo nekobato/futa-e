@@ -24,21 +24,26 @@ Intel Mac、Windows、Linux 向けの配布物はありません。
 ### 必要なツール
 
 - Git
-- Node.js `>=22.23.4 <23`（`.nvmrc` は `22.23.4`）
-- pnpm `>=9.15.0 <10`（`package.json` は `9.15.0` を指定）
+- Node.js `26.12.1`（`.node-version` と `.nvmrc` で選択）
+- pnpm `12.16.1`（`package.json` の `packageManager` で固定）
 
-Corepack を利用すると、`package.json` の `packageManager` に従って pnpm のバージョンを揃えられます。
+Node.js `26.12.1` を有効にしてから、同梱の npm で pnpm をインストールします。
+Node.js 26 には Corepack が同梱されないため、pnpm を直接導入します。
 
 ```bash
 git clone https://github.com/nekobato/futa-e.git
 cd futa-e
-corepack enable pnpm
+npm install --global pnpm@12.16.1
+node --version
 pnpm --version
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-`pnpm --version` が `9.15.0` であることを確認してください。`pnpm dev` は Vite の開発サーバーと Electron を起動します。
+`node --version` が `v26.12.1`、`pnpm --version` が `12.16.1` であることを確認してください。
+`pnpm dev` は Vite の開発サーバーと Electron を起動します。
+
+pnpm の依存バージョン上書きと、依存パッケージのインストールスクリプトの許可は `pnpm-workspace.yaml` で管理します。
 
 ## 開発時のコマンド
 
