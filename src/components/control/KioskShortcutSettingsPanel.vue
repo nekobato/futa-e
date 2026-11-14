@@ -8,11 +8,19 @@
       <div class="copy">
         <label :for="inputId">グローバルショートカット</label>
         <p :id="descriptionId" class="note">
-          Electronのaccelerator形式で入力します。例:
-          <code>CommandOrControl+Shift+K</code>
+          入力欄を選び、使いたいキーの組み合わせを押してください。
         </p>
-        <p :id="platformNoteId" class="note">
-          macOSでは<code>CommandOrControl</code>がCommand、<code>Alt</code>がOptionに対応します。
+        <p
+          :id="recordingStatusId"
+          class="note"
+          role="status"
+          aria-live="polite"
+        >
+          {{
+            isRecording
+              ? 'キー入力を待っています。Escapeで取り消せます。'
+              : 'Escapeで取消、Backspace / Deleteで入力を消去できます。'
+          }}
         </p>
         <p
           :id="statusId"
@@ -31,14 +39,17 @@
       <div class="form-controls">
         <ElInput
           :id="inputId"
+          ref="shortcutInput"
           name="kiosk-exit-shortcut"
-          :model-value="draft"
-          :maxlength="MAX_KIOSK_EXIT_SHORTCUT_LENGTH"
+          :model-value="displayValue || draft"
+          readonly
+          :disabled="pending"
+          placeholder="クリックしてキーを入力"
           autocomplete="off"
           spellcheck="false"
           :aria-describedby="descriptionIds"
           :aria-invalid="visibleError ? 'true' : 'false'"
-          @update:model-value="handleInput"
+          @keydown.capture="handleInputKeydown"
         />
         <ElButton native-type="submit" type="primary" :loading="pending">
           登録
@@ -49,12 +60,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useTemplateRef, watch } from 'vue'
+import type { InputInstance } from 'element-plus'
+import { useRecordHotkey } from 'v-record-hotkey'
 import type { KioskExitShortcutSettings } from '../../shared/ipc'
 import {
-  MAX_KIOSK_EXIT_SHORTCUT_LENGTH,
-  parseKioskExitShortcutInput
-} from '../../shared/kiosk-exit-shortcut'
+  acceleratorToHotkey,
+  hotkeyToAccelerator
+} from '../../shared/hotkey-accelerator'
+import { parseKioskExitShortcutInput } from '../../shared/kiosk-exit-shortcut'
 import { createId } from '../../shared/utils'
 
 const { settings, pending, errorMessage } = defineProps<{
@@ -69,12 +83,35 @@ const emit = defineEmits<{
 
 const inputId = createId()
 const descriptionId = createId()
-const platformNoteId = createId()
+const recordingStatusId = createId()
 const statusId = createId()
 const errorId = createId()
 const draft = ref(settings.accelerator)
 const submittedAccelerator = ref(settings.accelerator)
 const localError = ref('')
+const shortcutInput = useTemplateRef<InputInstance>('shortcutInput')
+const isMac = /mac|darwin/i.test(navigator.userAgent || navigator.platform)
+const {
+  value: recordedHotkey,
+  displayValue,
+  isRecording,
+  cancel
+} = useRecordHotkey(() => shortcutInput.value?.input, {
+  initial: acceleratorToHotkey(settings.accelerator, isMac),
+  onStart: () => {
+    localError.value = ''
+  },
+  onConfirm: (hotkey) => {
+    draft.value = hotkeyToAccelerator(hotkey, isMac) ?? ''
+    localError.value = draft.value
+      ? ''
+      : 'このキーは登録できません。別の組み合わせを入力してください。'
+  },
+  onClear: () => {
+    draft.value = ''
+    localError.value = ''
+  }
+})
 
 const visibleError = computed(
   () =>
@@ -82,7 +119,12 @@ const visibleError = computed(
     (draft.value === submittedAccelerator.value ? errorMessage : '')
 )
 const descriptionIds = computed(() =>
-  [descriptionId, platformNoteId, statusId, visibleError.value ? errorId : '']
+  [
+    descriptionId,
+    recordingStatusId,
+    statusId,
+    visibleError.value ? errorId : ''
+  ]
     .filter(Boolean)
     .join(' ')
 )
@@ -95,23 +137,56 @@ const statusMessage = computed(() =>
 watch(
   () => settings.accelerator,
   (accelerator) => {
+    cancel()
+    recordedHotkey.value = acceleratorToHotkey(accelerator, isMac)
     draft.value = accelerator
     submittedAccelerator.value = accelerator
     localError.value = ''
   }
 )
 
-/** Clears local validation feedback as soon as the user edits the value. */
-const handleInput = (value: string) => {
-  draft.value = value
-  localError.value = ''
+watch(
+  () => pending,
+  (isPending) => {
+    if (isPending) cancel()
+  }
+)
+
+/** Keeps Tab and Shift+Tab available for moving between form controls. */
+const handleInputKeydown = (event: Event) => {
+  if (!(event instanceof KeyboardEvent)) return
+
+  if (
+    event.key === 'Tab' &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.metaKey
+  ) {
+    cancel()
+    event.stopImmediatePropagation()
+  }
+
+  // A saved accelerator may not have a RecordedHotkey representation yet.
+  if (
+    !recordedHotkey.value &&
+    (event.key === 'Backspace' || event.key === 'Delete') &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey &&
+    !event.metaKey
+  ) {
+    draft.value = ''
+    localError.value = ''
+  }
 }
 
 /** Validates the required value before asking Electron to register it. */
 const handleSubmit = () => {
+  if (pending || isRecording.value) return
+
   const accelerator = parseKioskExitShortcutInput(draft.value)
   if (!accelerator) {
-    localError.value = 'ショートカットを入力してください。'
+    localError.value ||= 'ショートカットを入力してください。'
     return
   }
 
@@ -191,10 +266,5 @@ const handleSubmit = () => {
   align-items: center;
   gap: 10px;
   flex: 0 0 auto;
-}
-
-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.95em;
 }
 </style>

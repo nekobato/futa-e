@@ -8,3 +8,6 @@ allowBuilds:
   # Windows packaging is outside this project's supported targets.
   electron-winstaller: false
   esbuild: true
+
+minimumReleaseAgeExclude:
+  - v-record-hotkey@1.0.1

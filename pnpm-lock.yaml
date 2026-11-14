@@ -179,6 +179,9 @@ importers:
       element-plus:
         specifier: 2.14.7
         version: 2.14.7(vue@3.5.44(typescript@6.0.3))
+      v-record-hotkey:
+        specifier: 1.0.1
+        version: 1.0.1(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: 3.5.44
         version: 3.5.44(typescript@6.0.3)
@@ -2935,6 +2938,11 @@ packages:
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
+
+  v-record-hotkey@1.0.1:
+    resolution: {integrity: sha512-26a+1Aq8u2KDr8uVreR497qj/3F8XWF7Lwhp4npUAYvIaih/Dr7dcepD29AMDYiERNp/x43X1VYClXBd3oA0cQ==}
+    peerDependencies:
+      vue: '>=3.3.0'
 
   varint@6.0.0:
     resolution: {integrity: sha512-cXEIW6cfr15lFv563k4GuVuW/fiwjknytD37jIOLSdSWuOI6WnO/oKwmP2FQTU2l01LP8/M5TSAJpzUaGe3uWg==}
@@ -5896,6 +5904,10 @@ snapshots:
   utf8-byte-length@1.0.5: {}
 
   util-deprecate@1.0.2: {}
+
+  v-record-hotkey@1.0.1(vue@3.5.44(typescript@6.0.3)):
+    dependencies:
+      vue: 3.5.44(typescript@6.0.3)
 
   varint@6.0.0: {}
 

@@ -89,12 +89,14 @@ Display レーンの「再生対象」をオフにすると、選択中の Playl
 
 少なくとも 1 台の Display を有効にし、再生対象の Playlist に項目を追加してから、画面上部の「開始」を押します。有効な各 Display に全画面の Kiosk ウィンドウが開きます。
 
-「Kiosk終了」の「グローバルショートカット」には、Electronのaccelerator形式でキーを設定できます。
-既定値は`CommandOrControl+Shift+K`です。
-macOSでは`CommandOrControl`がCommand、`Alt`がOptionに対応します。
-入力後に「登録」を押し、「登録済み」と表示されることを確認してください。
+「Kiosk終了」の「グローバルショートカット」は、入力欄を選んでキーの組み合わせを押すと設定できます。
+macOSではCommand、Option、Shiftなどの修飾キーを記号で表示します。
+Escapeで記録を取り消し、Backspace / Deleteで入力を消去できます。
+Tab / Shift+Tabで入力欄から移動できます。
+キーを入力したあとに「登録」を押し、「登録済み」と表示されることを確認してください。
+既定値は`CommandOrControl+Shift+K`（macOSではCommand+Shift+K）です。
 
-ショートカットの書式が正しくない場合や、ほかのアプリが同じ組み合わせを使用している場合は登録されません。
+対応していないキーや、ほかのアプリが使用している組み合わせは登録できません。
 登録に失敗した場合は、以前のショートカットを維持します。
 
 終了方法は次のとおりです。

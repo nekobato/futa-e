@@ -35,6 +35,7 @@
     "@element-plus/icons-vue": "2.3.2",
     "electron-store": "12.0.0",
     "element-plus": "2.14.7",
+    "v-record-hotkey": "1.0.1",
     "vue": "3.5.44"
   },
   "devDependencies": {
