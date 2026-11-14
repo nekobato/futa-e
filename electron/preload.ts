@@ -45,6 +45,8 @@ const api: FutaeApi = {
       ipcRenderer.invoke('system:set-launch-at-login', enabled),
     getKioskExitShortcut: () =>
       ipcRenderer.invoke('system:get-kiosk-exit-shortcut'),
+    setKioskExitShortcutRecording: (recording) =>
+      ipcRenderer.invoke('system:set-kiosk-exit-shortcut-recording', recording),
     setKioskExitShortcut: (accelerator) =>
       ipcRenderer.invoke('system:set-kiosk-exit-shortcut', accelerator)
   }

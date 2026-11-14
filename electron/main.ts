@@ -346,15 +346,21 @@ const listDisplays = (): DisplayInfo[] => {
 }
 
 const createControlWindow = () => {
-  controlWindow = createWindow('control', {
+  const win = createWindow('control', {
     width: 1180,
     height: 760,
     minWidth: 800,
     minHeight: 600,
     title: APP_NAME
   })
+  controlWindow = win
 
-  controlWindow.on('closed', () => {
+  const resumeKioskExitShortcut = () => globalShortcut.setSuspended(false)
+  win.on('blur', resumeKioskExitShortcut)
+  win.webContents.on('did-start-loading', resumeKioskExitShortcut)
+  win.webContents.on('render-process-gone', resumeKioskExitShortcut)
+  win.on('closed', () => {
+    resumeKioskExitShortcut()
     controlWindow = null
   })
 }
@@ -887,6 +893,23 @@ ipcMain.handle('system:set-launch-at-login', async (_event, enabled: boolean) =>
 
 ipcMain.handle('system:get-kiosk-exit-shortcut', async () =>
   kioskExitShortcutController.get(editableConfig.kioskExitShortcut)
+)
+
+ipcMain.handle(
+  'system:set-kiosk-exit-shortcut-recording',
+  (event, recording: unknown) => {
+    const win = controlWindow
+    if (
+      !win ||
+      typeof recording !== 'boolean' ||
+      event.sender !== win.webContents ||
+      (recording && !win.isFocused())
+    ) {
+      throw new Error('ショートカットの記録状態を変更できません。')
+    }
+
+    globalShortcut.setSuspended(recording)
+  }
 )
 
 ipcMain.handle(

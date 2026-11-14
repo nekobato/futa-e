@@ -94,6 +94,33 @@ describe('Kiosk exit shortcut controller', () => {
     expect(controller.getActiveAccelerator()).toBe('Command+Shift+K')
   })
 
+  it('accepts another spelling of its registered shortcut without registering or releasing it again', () => {
+    const { registrations, registrar } = createRegistrar()
+    const onExit = vi.fn()
+    const controller = createKioskExitShortcutController(
+      registrar as never,
+      onExit
+    )
+    controller.set(DEFAULT_KIOSK_EXIT_SHORTCUT)
+    // Electron resolves CommandOrControl to Command on macOS.
+    registrar.isRegistered.mockImplementation((accelerator) =>
+      registrations.has(
+        accelerator === 'Command+Shift+K'
+          ? DEFAULT_KIOSK_EXIT_SHORTCUT
+          : accelerator
+      )
+    )
+
+    expect(controller.set('Command+Shift+K')).toEqual({
+      ok: true,
+      settings: { accelerator: 'Command+Shift+K', registered: true }
+    })
+    expect(registrar.register).toHaveBeenCalledOnce()
+    expect(registrar.unregister).not.toHaveBeenCalled()
+    registrations.get(DEFAULT_KIOSK_EXIT_SHORTCUT)?.()
+    expect(onExit).toHaveBeenCalledOnce()
+  })
+
   it('releases the previous shortcut after a replacement succeeds', () => {
     const { registrations, registrar } = createRegistrar()
     const controller = createKioskExitShortcutController(

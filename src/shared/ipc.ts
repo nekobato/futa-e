@@ -51,6 +51,7 @@ export type FutaeApi = {
     getLaunchAtLogin: () => Promise<LaunchAtLoginSettings>
     setLaunchAtLogin: (enabled: boolean) => Promise<LaunchAtLoginSettings>
     getKioskExitShortcut: () => Promise<KioskExitShortcutSettings>
+    setKioskExitShortcutRecording: (recording: boolean) => Promise<void>
     setKioskExitShortcut: (
       accelerator: string
     ) => Promise<KioskExitShortcutSettings>

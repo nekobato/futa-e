@@ -17,9 +17,11 @@
           aria-live="polite"
         >
           {{
-            isRecording
-              ? 'キー入力を待っています。Escapeで取り消せます。'
-              : 'Escapeで取消、Backspace / Deleteで入力を消去できます。'
+            isStarting
+              ? 'キー入力を準備しています。'
+              : isRecording
+                ? 'キー入力を待っています。Escapeで取り消せます。'
+                : 'Escapeで取消、Backspace / Deleteで入力を消去できます。'
           }}
         </p>
         <p
@@ -49,6 +51,9 @@
           spellcheck="false"
           :aria-describedby="descriptionIds"
           :aria-invalid="visibleError ? 'true' : 'false'"
+          @focus="beginRecording"
+          @click="beginRecording"
+          @blur="cancel"
           @keydown.capture="handleInputKeydown"
         />
         <ElButton native-type="submit" type="primary" :loading="pending">
@@ -63,6 +68,7 @@
 import { computed, ref, useTemplateRef, watch } from 'vue'
 import type { InputInstance } from 'element-plus'
 import { useRecordHotkey } from 'v-record-hotkey'
+import { useKioskShortcutRecording } from '../../composables/useKioskShortcutRecording'
 import type { KioskExitShortcutSettings } from '../../shared/ipc'
 import {
   acceleratorToHotkey,
@@ -71,10 +77,11 @@ import {
 import { parseKioskExitShortcutInput } from '../../shared/kiosk-exit-shortcut'
 import { createId } from '../../shared/utils'
 
-const { settings, pending, errorMessage } = defineProps<{
+const { settings, pending, errorMessage, setRecording } = defineProps<{
   settings: KioskExitShortcutSettings
   pending: boolean
   errorMessage: string
+  setRecording: (recording: boolean) => Promise<void>
 }>()
 
 const emit = defineEmits<{
@@ -91,13 +98,11 @@ const submittedAccelerator = ref(settings.accelerator)
 const localError = ref('')
 const shortcutInput = useTemplateRef<InputInstance>('shortcutInput')
 const isMac = /mac|darwin/i.test(navigator.userAgent || navigator.platform)
-const {
-  value: recordedHotkey,
-  displayValue,
-  isRecording,
-  cancel
-} = useRecordHotkey(() => shortcutInput.value?.input, {
+const recorder = useRecordHotkey(() => shortcutInput.value?.input, {
   initial: acceleratorToHotkey(settings.accelerator, isMac),
+  startOnFocus: false,
+  startOnClick: false,
+  startOnEnter: false,
   onStart: () => {
     localError.value = ''
   },
@@ -112,6 +117,20 @@ const {
     localError.value = ''
   }
 })
+const { value: recordedHotkey, displayValue, isRecording } = recorder
+const { isStarting, start, cancel, readyForSubmission } =
+  useKioskShortcutRecording({
+    input: () => shortcutInput.value?.input,
+    recorder,
+    setRecording: (recording) => setRecording(recording),
+    onError: (message) => {
+      localError.value = message
+    }
+  })
+
+const beginRecording = () => {
+  if (!pending) void start()
+}
 
 const visibleError = computed(
   () =>
@@ -164,6 +183,28 @@ const handleInputKeydown = (event: Event) => {
   ) {
     cancel()
     event.stopImmediatePropagation()
+    return
+  }
+
+  if (isStarting.value) {
+    if (event.key === 'Escape') cancel()
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    return
+  }
+
+  if (
+    !isRecording.value &&
+    event.key === 'Enter' &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey &&
+    !event.metaKey
+  ) {
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    beginRecording()
+    return
   }
 
   // A saved accelerator may not have a RecordedHotkey representation yet.
@@ -180,19 +221,28 @@ const handleInputKeydown = (event: Event) => {
   }
 }
 
-/** Validates the required value before asking Electron to register it. */
-const handleSubmit = () => {
-  if (pending || isRecording.value) return
+let submitting = false
 
-  const accelerator = parseKioskExitShortcutInput(draft.value)
-  if (!accelerator) {
-    localError.value ||= 'ショートカットを入力してください。'
-    return
+/** Resumes the native shortcut before registering the confirmed value. */
+const handleSubmit = async () => {
+  if (pending || isStarting.value || isRecording.value || submitting) return
+
+  submitting = true
+  try {
+    if (!(await readyForSubmission()) || pending) return
+
+    const accelerator = parseKioskExitShortcutInput(draft.value)
+    if (!accelerator) {
+      localError.value ||= 'ショートカットを入力してください。'
+      return
+    }
+
+    draft.value = accelerator
+    submittedAccelerator.value = accelerator
+    emit('update', accelerator)
+  } finally {
+    submitting = false
   }
-
-  draft.value = accelerator
-  submittedAccelerator.value = accelerator
-  emit('update', accelerator)
 }
 </script>
 

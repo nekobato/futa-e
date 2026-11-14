@@ -153,6 +153,7 @@
         :settings="kioskExitShortcutSettings"
         :pending="kioskExitShortcutPending"
         :error-message="kioskExitShortcutError"
+        :set-recording="setKioskExitShortcutRecording"
         @update="setKioskExitShortcut"
       />
     </main>
@@ -196,6 +197,7 @@ const {
   setDisplayEnabled,
   setLaunchAtLogin,
   setKioskExitShortcut,
+  setKioskExitShortcutRecording,
   setSelectedDisplayPlaylistEnabled,
   startPlayer,
   toggleSelectedPlaylistPerDisplay,

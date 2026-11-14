@@ -6,6 +6,16 @@ import { DEFAULT_KIOSK_EXIT_SHORTCUT } from '../../src/shared/kiosk-exit-shortcu
 import type { KioskExitShortcutSettings } from '../../src/shared/ipc'
 
 const cleanups: Array<() => void> = []
+const flushRecording = () =>
+  new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+const deferred = () => {
+  let resolve!: () => void
+  const promise = new Promise<void>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
 
 afterEach(() => {
   cleanups.splice(0).forEach((cleanup) => cleanup())
@@ -15,13 +25,16 @@ const mountPanel = async (isMac = true) => {
   vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
     isMac ? 'Macintosh' : 'Windows'
   )
+  const setRecording = vi.fn<(recording: boolean) => Promise<void>>()
+  setRecording.mockResolvedValue(undefined)
   const props = reactive({
     settings: {
       accelerator: DEFAULT_KIOSK_EXIT_SHORTCUT,
       registered: true
     } as KioskExitShortcutSettings,
     pending: false,
-    errorMessage: ''
+    errorMessage: '',
+    setRecording
   })
   const onUpdate = vi.fn()
   const container = document.createElement('div')
@@ -32,31 +45,45 @@ const mountPanel = async (isMac = true) => {
   app.component('ElInput', ElInput)
   app.component('ElButton', ElButton)
   app.mount(container)
-  cleanups.push(() => {
+  let mounted = true
+  const unmount = () => {
+    if (!mounted) return
+    mounted = false
     app.unmount()
     container.remove()
-  })
+  }
+  cleanups.push(unmount)
   await nextTick()
 
   const input = container.querySelector('input')!
   const pressKey = async (init: KeyboardEventInit) => {
+    await flushRecording()
     const event = new KeyboardEvent('keydown', {
       bubbles: true,
       cancelable: true,
       ...init
     })
     input.dispatchEvent(event)
-    await nextTick()
+    await flushRecording()
     return event
   }
   const submit = async () => {
     input.blur()
-    await nextTick()
+    await flushRecording()
     container.querySelector('form')!.requestSubmit()
-    await nextTick()
+    await flushRecording()
   }
 
-  return { container, input, onUpdate, pressKey, props, submit }
+  return {
+    container,
+    input,
+    onUpdate,
+    pressKey,
+    props,
+    setRecording,
+    submit,
+    unmount
+  }
 }
 
 describe('Kiosk shortcut recorder integration', () => {
@@ -86,6 +113,134 @@ describe('Kiosk shortcut recorder integration', () => {
     expect(onUpdate).not.toHaveBeenCalled()
     await submit()
     expect(onUpdate).toHaveBeenCalledExactlyOnceWith('Command+Shift+J')
+  })
+
+  it('suspends the saved shortcut while re-recording it and resumes before submission', async () => {
+    const { input, onUpdate, pressKey, setRecording, submit } =
+      await mountPanel()
+    let suspended = false
+    setRecording.mockImplementation(async (recording) => {
+      suspended = recording
+    })
+
+    input.focus()
+    await pressKey({
+      key: 'Shift',
+      code: 'ShiftLeft',
+      metaKey: true,
+      shiftKey: true
+    })
+    expect(suspended).toBe(true)
+    expect(input.value).toBe('⇧⌘')
+
+    await pressKey({ key: 'K', code: 'KeyK', metaKey: true, shiftKey: true })
+    expect(input.value).toBe('⇧⌘K')
+    expect(suspended).toBe(false)
+    expect(setRecording.mock.calls).toEqual([[true], [false]])
+    expect(onUpdate).not.toHaveBeenCalled()
+
+    await submit()
+    expect(onUpdate).toHaveBeenCalledExactlyOnceWith('Command+Shift+K')
+  })
+
+  it.each([
+    'escape',
+    'tab',
+    'blur',
+    'window-blur',
+    'pagehide',
+    'clear',
+    'pending',
+    'unmount'
+  ])(
+    'restores the native shortcut when recording ends through %s',
+    async (action) => {
+      const { input, onUpdate, pressKey, props, setRecording, unmount } =
+        await mountPanel()
+      input.focus()
+      await pressKey({ key: 'Shift', code: 'ShiftLeft', shiftKey: true })
+      expect(setRecording).toHaveBeenCalledExactlyOnceWith(true)
+
+      if (action === 'escape') await pressKey({ key: 'Escape', code: 'Escape' })
+      if (action === 'tab') await pressKey({ key: 'Tab', code: 'Tab' })
+      if (action === 'blur') input.blur()
+      if (action === 'window-blur') window.dispatchEvent(new Event('blur'))
+      if (action === 'pagehide') window.dispatchEvent(new Event('pagehide'))
+      if (action === 'clear')
+        await pressKey({ key: 'Backspace', code: 'Backspace' })
+      if (action === 'pending') props.pending = true
+      if (action === 'unmount') unmount()
+      await flushRecording()
+
+      expect(setRecording.mock.calls).toEqual([[true], [false]])
+      expect(onUpdate).not.toHaveBeenCalled()
+    }
+  )
+
+  it('does not start a canceled recording when the suspension reply arrives late', async () => {
+    const { input, pressKey, setRecording } = await mountPanel()
+    const suspension = deferred()
+    setRecording.mockReturnValueOnce(suspension.promise)
+
+    input.focus()
+    input.blur()
+    suspension.resolve()
+    await pressKey({ key: 'J', code: 'KeyJ', metaKey: true, shiftKey: true })
+
+    expect(input.value).toBe('⇧⌘K')
+    expect(setRecording.mock.calls).toEqual([[true], [false]])
+  })
+
+  it('waits for native restoration before registering and blocks duplicate submissions', async () => {
+    const { input, onUpdate, pressKey, setRecording, submit } =
+      await mountPanel()
+    const restoration = deferred()
+    setRecording.mockImplementation((recording) =>
+      recording ? Promise.resolve() : restoration.promise
+    )
+
+    input.focus()
+    await pressKey({ key: 'K', code: 'KeyK', metaKey: true, shiftKey: true })
+    await submit()
+    await submit()
+    expect(onUpdate).not.toHaveBeenCalled()
+
+    restoration.resolve()
+    await flushRecording()
+    expect(onUpdate).toHaveBeenCalledExactlyOnceWith('Command+Shift+K')
+  })
+
+  it('shows a suspension failure without starting to capture keys', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { container, input, pressKey, setRecording } = await mountPanel()
+    setRecording.mockRejectedValueOnce(new Error('Suspension failed'))
+
+    input.focus()
+    await pressKey({ key: 'J', code: 'KeyJ', metaKey: true, shiftKey: true })
+
+    expect(input.value).toBe('⇧⌘K')
+    expect(setRecording.mock.calls).toEqual([[true], [false]])
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      'キー入力の記録を開始できませんでした。'
+    )
+  })
+
+  it('does not register while native restoration has failed', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { container, input, onUpdate, pressKey, setRecording, submit } =
+      await mountPanel()
+    setRecording.mockImplementation(async (recording) => {
+      if (!recording) throw new Error('Restoration failed')
+    })
+
+    input.focus()
+    await pressKey({ key: 'K', code: 'KeyK', metaKey: true, shiftKey: true })
+    await submit()
+
+    expect(onUpdate).not.toHaveBeenCalled()
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      'ショートカットを復元できませんでした。'
+    )
   })
 
   it('cancels a modifier preview with Escape and restores the confirmed value', async () => {

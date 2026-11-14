@@ -52,7 +52,8 @@ export const createKioskExitShortcutController = (
   })
 
   const set = (accelerator: string): KioskExitShortcutRegistrationResult => {
-    if (activeAccelerator === accelerator && isRegistered(accelerator)) {
+    if (activeAccelerator && isRegistered(accelerator)) {
+      activeAccelerator = accelerator
       return { ok: true, settings: get(accelerator) }
     }
 

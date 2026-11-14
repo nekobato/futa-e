@@ -36,6 +36,7 @@ const createPreloadApi = (): FutaeApi => ({
       accelerator: 'CommandOrControl+Shift+K',
       registered: true
     }),
+    setKioskExitShortcutRecording: async () => undefined,
     setKioskExitShortcut: async (accelerator) => ({
       accelerator,
       registered: true

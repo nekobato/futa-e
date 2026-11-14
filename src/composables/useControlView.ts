@@ -260,6 +260,9 @@ export const useControlView = () => {
     }
   }
 
+  const setKioskExitShortcutRecording = (recording: boolean) =>
+    api.system.setKioskExitShortcutRecording(recording)
+
   /** Validates, registers, and persists a system-wide Kiosk exit shortcut. */
   const setKioskExitShortcut = async (accelerator: string) => {
     if (kioskExitShortcutPending.value) {
@@ -737,6 +740,7 @@ export const useControlView = () => {
     setDisplayEnabled,
     setLaunchAtLogin,
     setKioskExitShortcut,
+    setKioskExitShortcutRecording,
     setSelectedDisplayPlaylistEnabled,
     startPlayer,
     toggleSelectedPlaylistPerDisplay,
