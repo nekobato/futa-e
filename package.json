@@ -34,24 +34,24 @@
   "dependencies": {
     "@element-plus/icons-vue": "2.3.2",
     "electron-store": "12.0.0",
-    "element-plus": "2.14.7",
+    "element-plus": "2.14.8",
     "v-record-hotkey": "1.0.1",
-    "vue": "3.5.44"
+    "vue": "3.5.45"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
     "@vitejs/plugin-vue": "6.0.10",
-    "electron": "45.2.1",
+    "electron": "45.2.3",
     "electron-builder": "26.18.0",
-    "jsdom": "30.1.3",
+    "jsdom": "31.0.0",
     "prettier": "3.9.10",
-    "sass-embedded": "1.107.1",
+    "sass-embedded": "1.108.1",
     "typescript": "6.0.3",
-    "vite": "8.3.5",
+    "vite": "8.3.6",
     "vite-plugin-electron": "1.2.0",
     "vite-plugin-electron-renderer": "1.0.0",
     "vitepress": "^1.6.4",
-    "vitest": "5.0.5",
+    "vitest": "5.1.0",
     "vue-tsc": "3.3.14"
   }
 }
